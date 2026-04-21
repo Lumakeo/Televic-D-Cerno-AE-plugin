@@ -1,8 +1,8 @@
 PluginInfo = {
   Name        = "Confero~Agenda Manager",
-  Version     = "1.0.0",
-  Id          = "Confero.AgendaManager.v1",
-  Description = "Gestione ordine del giorno e votazioni – Televic Confero (Plixus/G4)",
+  Version     = "2.0.0",
+  Id          = "Confero.AgendaManager.v2",
+  Description = "Gestione ordine del giorno, votazioni, sedili e audio – Televic Confero (Plixus/G4)",
   Author      = "Matteo Fioretto – Prase, a Midwich company"
 }
 
@@ -22,6 +22,7 @@ function GetProperties()
     { Name="Use HTTPS",      Type="boolean", Value=true },
     { Name="Bearer Token",   Type="string",  Value="" },
     { Name="Data File Path", Type="string",  Value="agendas.json" },
+    { Name="Seats",          Type="integer", Min=1, Max=300, Value=25 },
   }
 end
 
@@ -31,6 +32,8 @@ function GetPages(props)
     { name="Riunione / Meeting" },
     { name="Votazione / Voting" },
     { name="Risultati / Results" },
+    { name="Sistema / System" },
+    { name="Wireless" },
     { name="Info" },
   }
 end
@@ -38,18 +41,23 @@ end
 function GetControls(props)
   local ctrls = {}
   local function add(t) table.insert(ctrls, t) end
-  -- System
+
+  -- Status / System
+  add{Name="Status",           ControlType="Indicator",IndicatorType="Status",PinStyle="Output",UserPin=true,Count=1}
   add{Name="conn_status_led",  ControlType="Indicator",IndicatorType="Led",PinStyle="Output",UserPin=true,Count=1}
   add{Name="conn_status_text", ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="ConnectServer",    ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="ConnectStatus",    ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   add{Name="debug_log",        ControlType="Text",PinStyle="Output",UserPin=true,Count=1}
-  -- Tab 1
+
+  -- Tab 1: Ordine del Giorno
   add{Name="odg_meeting_title",      ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_meeting_date",       ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_new_agenda",         ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_save_agenda",        ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_load_agenda",        ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
-  add{Name="odg_date_select",        ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=4}
-  add{Name="odg_date_label",         ControlType="Text",PinStyle="Both",UserPin=true,Count=4}
+  for i=1,4 do add{Name=string.format("odg_date_select_%d",i),ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,4 do add{Name=string.format("odg_date_label_%d",i), ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
   add{Name="odg_page_prev",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_page_next",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_page_indicator",     ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
@@ -57,23 +65,24 @@ function GetControls(props)
   add{Name="odg_remove_item",        ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_move_up",            ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_move_down",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
-  add{Name="odg_item_title",         ControlType="Text",PinStyle="Both",UserPin=true,Count=5}
-  add{Name="odg_item_select",        ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=5}
-  add{Name="odg_item_has_vote",      ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=5}
+  for i=1,5 do add{Name=string.format("odg_item_title_%d",i),   ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,5 do add{Name=string.format("odg_item_select_%d",i),  ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,5 do add{Name=string.format("odg_item_has_vote_%d",i),ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1} end
   add{Name="odg_selected_label",     ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_detail_title",       ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_detail_vote_title",  ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
-  add{Name="odg_detail_vote_mode",   ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=4}
+  for i=1,4 do add{Name=string.format("odg_detail_vote_mode_%d",i),ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1} end
   add{Name="odg_detail_preset",      ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
-  add{Name="odg_detail_choice_label",ControlType="Text",PinStyle="Both",UserPin=true,Count=6}
-  add{Name="odg_detail_choice_color",ControlType="Text",PinStyle="Both",UserPin=true,Count=6}
-  add{Name="odg_detail_result_vis",  ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=2}
+  for i=1,6 do add{Name=string.format("odg_detail_choice_label_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,6 do add{Name=string.format("odg_detail_choice_color_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,2 do add{Name=string.format("odg_detail_result_vis_%d",i),ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1} end
   add{Name="odg_detail_realtime",    ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_json_export",        ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_json_import",        ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_do_export",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_do_import",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
-  -- Tab 2
+
+  -- Tab 2: Riunione
   add{Name="mtg_status_led",         ControlType="Indicator",IndicatorType="Led",PinStyle="Output",UserPin=true,Count=1}
   add{Name="mtg_status_text",        ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   add{Name="mtg_start",              ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
@@ -85,36 +94,65 @@ function GetControls(props)
   add{Name="mtg_start_discussion",   ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="mtg_stop_discussion",    ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="mtg_discussion_status",  ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
-  -- Tab 3
+
+  -- Tab 3: Votazione
   add{Name="vote_status_led",        ControlType="Indicator",IndicatorType="Led",PinStyle="Output",UserPin=true,Count=1}
   add{Name="vote_status_text",       ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   add{Name="vote_use_config",        ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
   add{Name="vote_title_display",     ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   add{Name="vote_manual_title",      ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
-  add{Name="vote_choice_label",      ControlType="Text",PinStyle="Both",UserPin=true,Count=6}
-  add{Name="vote_choice_color",      ControlType="Text",PinStyle="Both",UserPin=true,Count=6}
+  for i=1,6 do add{Name=string.format("vote_choice_label_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,6 do add{Name=string.format("vote_choice_color_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
   add{Name="vote_num_choices",       ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
-  add{Name="vote_result_vis",        ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=2}
+  for i=1,2 do add{Name=string.format("vote_result_vis_%d",i),ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1} end
   add{Name="vote_realtime",          ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
   add{Name="vote_start",             ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="vote_stop",              ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="vote_hide_results",      ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
-  add{Name="vote_result_label",      ControlType="Text",PinStyle="Both",UserPin=true,Count=6}
-  add{Name="vote_result_count",      ControlType="Text",PinStyle="Both",UserPin=true,Count=6}
-  add{Name="vote_result_bar",        ControlType="Knob",ControlUnit="Float",Min=0,Max=100,PinStyle="Both",UserPin=true,Count=6}
-  add{Name="vote_result_pct",        ControlType="Text",PinStyle="Both",UserPin=true,Count=6}
+  for i=1,6 do add{Name=string.format("vote_result_label_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,6 do add{Name=string.format("vote_result_count_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,6 do add{Name=string.format("vote_result_bar_%d",i),  ControlType="Knob",ControlUnit="Float",Min=0,Max=100,PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,6 do add{Name=string.format("vote_result_pct_%d",i),  ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
   add{Name="vote_total_votes",       ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
-  -- Tab 4
-  add{Name="res_item_title",         ControlType="Text",PinStyle="Both",UserPin=true,Count=20}
-  add{Name="res_item_vtitle",        ControlType="Text",PinStyle="Both",UserPin=true,Count=20}
-  add{Name="res_item_summary",       ControlType="Text",PinStyle="Both",UserPin=true,Count=20}
-  add{Name="res_item_total",         ControlType="Text",PinStyle="Both",UserPin=true,Count=20}
+
+  -- Tab 4: Risultati
+  for i=1,20 do add{Name=string.format("res_item_title_%d",i),  ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,20 do add{Name=string.format("res_item_vtitle_%d",i), ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,20 do add{Name=string.format("res_item_summary_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,20 do add{Name=string.format("res_item_total_%d",i),  ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
   add{Name="res_clear",              ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="res_page_prev",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="res_page_next",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="res_page_indicator",     ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
-  -- Tab 5
+
+  -- Tab 5: Sistema
+  add{Name="Defaultchannelselectorvolume",     ControlType="Knob",ControlUnit="Integer",Min=0,Max=32,PinStyle="Both",UserPin=true,Count=1}
+  add{Name="DefaultchannelselectorvolumeText", ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="LoudSpeakervolume",                ControlType="Knob",ControlUnit="Integer",Min=0,Max=25,PinStyle="Both",UserPin=true,Count=1}
+  add{Name="LoudSpeakervolumeText",            ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="SeatsList",    ControlType="Text",HTextAlign="Left",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="SpeakerList",  ControlType="Text",HTextAlign="Left",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="RequestList",  ControlType="Text",HTextAlign="Left",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="MeetingType",  ControlType="Indicator",IndicatorType="Led",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="MeetingTitle", ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="TurnOnMic",    ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="TurnOffMic",   ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="ToSpeaker",    ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="Recording",       ControlType="Indicator",IndicatorType="Led",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="RecordingStatus", ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="StartRecording",  ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
+  local seats = props["Seats"].Value
+  for i=1,seats do add{Name=string.format("SeatButton_%d",i),ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,seats do add{Name=string.format("RequestLED_%d",i),ControlType="Indicator",IndicatorType="Led",PinStyle="Both",UserPin=true,Count=1} end
+
+  -- Tab 6: Wireless
+  add{Name="WirelessShutdown",   ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="WirelessDeviceList", ControlType="Text",HTextAlign="Left",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="GetWirelessUnits",   ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
+
+  -- Tab 7: Info
   add{Name="info_display", ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+
   return ctrls
 end
 
@@ -133,19 +171,24 @@ function GetControlLayout(props)
   local function sep(y)
     table.insert(graphics,{Type="GroupBox",Fill=C.Gray,StrokeWidth=0,Position={0,y},Size={900,1}})
   end
-  local function shared(pg_arg)
+  local function gbox(txt,x,y,w,h)
+    table.insert(graphics,{Type="GroupBox",Text=txt,TextFont="Lato",TextFontSize=9,TextColor=C.LtGy,Fill=C.Dark,StrokeColor=C.Gray,StrokeWidth=1,CornerRadius=4,Position={x,y},Size={w,h}})
+  end
+  local function shared()
+    layout["Status"]          ={Style="Status",Position={2,8},Size={18,22}}
     layout["conn_status_led"] ={Style="Led",Position={798,10},Size={14,14},Color=C.Grn,OffColor=C.Red,UnlinkOffColor=true}
     layout["conn_status_text"]={Style="Text",Position={816,8},Size={78,18},IsReadOnly=true,FontSize=9}
     layout["debug_log"]       ={Style="Text",Position={0,645},Size={900,16},IsReadOnly=true,FontSize=8}
   end
 
+  -- ── Page 1: Ordine del Giorno ─────────────────────────────────────────────────
   if pg == 1 then
     hdr("Ordine del Giorno / Agenda")
     shared()
 
     lbl("Titolo Riunione",10,44,100,14,9)
     layout["odg_meeting_title"]={Style="Text",Position={10,58},Size={340,22}}
-    lbl("Data (YYYY-MM-DD)",358,44,130,14,9)
+    lbl("Data (GG/MM/AAAA)",358,44,130,14,9)
     layout["odg_meeting_date"]={Style="Text",Position={358,58},Size={130,22}}
     layout["odg_save_agenda"] ={Style="Button",Position={496,57},Size={92,24},Legend="Salva",Color=C.Blu}
     layout["odg_load_agenda"] ={Style="Button",Position={594,57},Size={92,24},Legend="Carica"}
@@ -154,8 +197,8 @@ function GetControlLayout(props)
     lbl("Date salvate:",10,87,90,14,9)
     for i=1,4 do
       local x=100+(i-1)*198
-      layout[string.format("odg_date_label %d",i)]  ={Style="Text",Position={x,85},Size={120,18},IsReadOnly=true}
-      layout[string.format("odg_date_select %d",i)]  ={Style="Button",Position={x+122,83},Size={72,22},Legend="Carica"}
+      layout[string.format("odg_date_label_%d",i)]  ={Style="Text",Position={x,85},Size={120,18},IsReadOnly=true}
+      layout[string.format("odg_date_select_%d",i)] ={Style="Button",Position={x+122,83},Size={72,22},Legend="Carica"}
     end
 
     sep(107)
@@ -166,9 +209,9 @@ function GetControlLayout(props)
 
     for i=1,5 do
       local y=128+(i-1)*36
-      layout[string.format("odg_item_title %d",i)]   ={Style="Text",Position={44,y},Size={490,22},IsReadOnly=true}
-      layout[string.format("odg_item_has_vote %d",i)] ={Style="Button",Position={540,y},Size={60,22},Legend="V",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
-      layout[string.format("odg_item_select %d",i)]   ={Style="Button",Position={608,y},Size={60,22},Legend="Sel.",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+      layout[string.format("odg_item_title_%d",i)]   ={Style="Text",Position={44,y},Size={490,22},IsReadOnly=true}
+      layout[string.format("odg_item_has_vote_%d",i)] ={Style="Button",Position={540,y},Size={60,22},Legend="V",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+      layout[string.format("odg_item_select_%d",i)]   ={Style="Button",Position={608,y},Size={60,22},Legend="Sel.",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
     end
 
     layout["odg_page_prev"]     ={Style="Button",Position={10,316},Size={80,24},Legend="◀ Prec."}
@@ -188,21 +231,21 @@ function GetControlLayout(props)
 
     lbl("Scelte:",10,462,50,14,9)
     for i=1,4 do
-      layout[string.format("odg_detail_vote_mode %d",i)]={Style="Button",Position={62+(i-1)*58,460},Size={54,22},Legend=tostring(i+2).." sc.",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+      layout[string.format("odg_detail_vote_mode_%d",i)]={Style="Button",Position={62+(i-1)*58,460},Size={54,22},Legend=tostring(i+2).." sc.",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
     end
     layout["odg_detail_preset"]={Style="Button",Position={300,460},Size={90,22},Legend="Preset",Color=C.TV}
 
+    lbl("Scelte 1-6 / label + colore hex",10,476,400,12,8)
     for i=1,6 do
       local row=math.ceil(i/2); local col=((i-1)%2)
       local bx=10+col*440; local by=488+(row-1)*22
-      layout[string.format("odg_detail_choice_label %d",i)]={Style="Text",Position={bx,by},Size={200,18}}
-      layout[string.format("odg_detail_choice_color %d",i)]={Style="Text",Position={bx+205,by},Size={80,18}}
+      layout[string.format("odg_detail_choice_label_%d",i)]={Style="Text",Position={bx,by},Size={200,18}}
+      layout[string.format("odg_detail_choice_color_%d",i)]={Style="Text",Position={bx+205,by},Size={80,18}}
     end
-    lbl("Scelte 1-6 / label + colore hex",10,476,400,12,8)
 
-    layout["odg_detail_result_vis 1"]={Style="Button",Position={740,488},Size={75,18},Legend="Pubbl.",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
-    layout["odg_detail_result_vis 2"]={Style="Button",Position={740,510},Size={75,18},Legend="Indiv.",ButtonStyle="Toggle",Color=C.Orn,OffColor=C.Gray,UnlinkOffColor=true}
-    layout["odg_detail_realtime"]    ={Style="Button",Position={820,488},Size={68,40},Legend="Realtime",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+    layout[string.format("odg_detail_result_vis_%d",1)]={Style="Button",Position={740,488},Size={75,18},Legend="Pubbl.",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout[string.format("odg_detail_result_vis_%d",2)]={Style="Button",Position={740,510},Size={75,18},Legend="Indiv.",ButtonStyle="Toggle",Color=C.Orn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["odg_detail_realtime"]={Style="Button",Position={820,488},Size={68,40},Legend="Realtime",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
 
     sep(556)
     lbl("Export JSON:",10,561,80,12,9)
@@ -212,6 +255,7 @@ function GetControlLayout(props)
     layout["odg_json_import"]={Style="Text",Position={440,574},Size={448,50}}
     layout["odg_do_import"]  ={Style="Button",Position={440,628},Size={110,20},Legend="Importa",Color=C.Blu}
 
+  -- ── Page 2: Riunione ─────────────────────────────────────────────────────────
   elseif pg == 2 then
     hdr("Riunione / Meeting")
     shared()
@@ -234,6 +278,7 @@ function GetControlLayout(props)
     layout["mtg_stop_discussion"]  ={Style="Button",Position={220,338},Size={200,36},Legend="■ Ferma Discussione",Color=C.Orn}
     layout["mtg_discussion_status"]={Style="Text",Position={10,384},Size={878,22},IsReadOnly=true}
 
+  -- ── Page 3: Votazione ────────────────────────────────────────────────────────
   elseif pg == 3 then
     hdr("Votazione / Voting")
     shared()
@@ -251,12 +296,12 @@ function GetControlLayout(props)
     for i=1,6 do
       local y=198+(i-1)*22
       lbl(tostring(i)..":",10,y,16,18,9)
-      layout[string.format("vote_choice_label %d",i)]={Style="Text",Position={28,y},Size={200,18}}
-      layout[string.format("vote_choice_color %d",i)]={Style="Text",Position={232,y},Size={90,18}}
+      layout[string.format("vote_choice_label_%d",i)]={Style="Text",Position={28,y},Size={200,18}}
+      layout[string.format("vote_choice_color_%d",i)]={Style="Text",Position={232,y},Size={90,18}}
     end
 
-    layout["vote_result_vis 1"]={Style="Button",Position={340,198},Size={130,22},Legend="Pubblico",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
-    layout["vote_result_vis 2"]={Style="Button",Position={340,224},Size={130,22},Legend="Individuale",ButtonStyle="Toggle",Color=C.Orn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout[string.format("vote_result_vis_%d",1)]={Style="Button",Position={340,198},Size={130,22},Legend="Pubblico",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout[string.format("vote_result_vis_%d",2)]={Style="Button",Position={340,224},Size={130,22},Legend="Individuale",ButtonStyle="Toggle",Color=C.Orn,OffColor=C.Gray,UnlinkOffColor=true}
     layout["vote_realtime"]    ={Style="Button",Position={340,250},Size={130,22},Legend="Realtime ON",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
 
     layout["vote_start"]       ={Style="Button",Position={10,334},Size={180,36},Legend="▶ Avvia Votazione",Color=C.Grn}
@@ -269,12 +314,13 @@ function GetControlLayout(props)
 
     for i=1,6 do
       local y=408+(i-1)*36
-      layout[string.format("vote_result_label %d",i)]={Style="Text",Position={10,y},Size={200,22},IsReadOnly=true}
-      layout[string.format("vote_result_count %d",i)]={Style="Text",Position={214,y},Size={100,22},IsReadOnly=true}
-      layout[string.format("vote_result_bar %d",i)]  ={Style="Meter",Position={318,y},Size={400,22},Min=0,Max=100}
-      layout[string.format("vote_result_pct %d",i)]  ={Style="Text",Position={722,y},Size={60,22},IsReadOnly=true}
+      layout[string.format("vote_result_label_%d",i)]={Style="Text",Position={10,y},Size={200,22},IsReadOnly=true}
+      layout[string.format("vote_result_count_%d",i)]={Style="Text",Position={214,y},Size={100,22},IsReadOnly=true}
+      layout[string.format("vote_result_bar_%d",i)]  ={Style="Meter",Position={318,y},Size={400,22},Min=0,Max=100}
+      layout[string.format("vote_result_pct_%d",i)]  ={Style="Text",Position={722,y},Size={60,22},IsReadOnly=true}
     end
 
+  -- ── Page 4: Risultati ────────────────────────────────────────────────────────
   elseif pg == 4 then
     hdr("Risultati / Results")
     shared()
@@ -288,17 +334,100 @@ function GetControlLayout(props)
 
     for i=1,20 do
       local y=60+(i-1)*27
-      layout[string.format("res_item_title %d",i)]  ={Style="Text",Position={44,y},Size={296,22},IsReadOnly=true}
-      layout[string.format("res_item_vtitle %d",i)] ={Style="Text",Position={344,y},Size={256,22},IsReadOnly=true}
-      layout[string.format("res_item_summary %d",i)]={Style="Text",Position={604,y},Size={218,22},IsReadOnly=true}
-      layout[string.format("res_item_total %d",i)]  ={Style="Text",Position={826,y},Size={54,22},IsReadOnly=true}
+      layout[string.format("res_item_title_%d",i)]  ={Style="Text",Position={44,y},Size={296,22},IsReadOnly=true}
+      layout[string.format("res_item_vtitle_%d",i)] ={Style="Text",Position={344,y},Size={256,22},IsReadOnly=true}
+      layout[string.format("res_item_summary_%d",i)]={Style="Text",Position={604,y},Size={218,22},IsReadOnly=true}
+      layout[string.format("res_item_total_%d",i)]  ={Style="Text",Position={826,y},Size={54,22},IsReadOnly=true}
     end
 
-    layout["res_page_prev"]    ={Style="Button",Position={10,612},Size={80,22},Legend="◀ Prec."}
+    layout["res_page_prev"]     ={Style="Button",Position={10,612},Size={80,22},Legend="◀ Prec."}
     layout["res_page_indicator"]={Style="Text",Position={96,612},Size={160,22},IsReadOnly=true}
-    layout["res_page_next"]    ={Style="Button",Position={262,612},Size={80,22},Legend="Succ. ▶"}
+    layout["res_page_next"]     ={Style="Button",Position={262,612},Size={80,22},Legend="Succ. ▶"}
 
+  -- ── Page 5: Sistema / System ─────────────────────────────────────────────────
   elseif pg == 5 then
+    hdr("Sistema / System")
+    layout["Status"]          ={Style="Status",Position={2,8},Size={18,22}}
+    layout["conn_status_led"] ={Style="Led",Position={798,10},Size={14,14},Color=C.Grn,OffColor=C.Red,UnlinkOffColor=true}
+    layout["conn_status_text"]={Style="Text",Position={816,8},Size={78,18},IsReadOnly=true,FontSize=9}
+
+    -- Connessione groupbox
+    gbox("Connessione",4,42,888,56)
+    layout["conn_status_led"] ={Style="Led",Position={14,52},Size={16,16},Color=C.Grn,OffColor=C.Red,UnlinkOffColor=true}
+    layout["conn_status_text"]={Style="Text",Position={36,50},Size={140,22},IsReadOnly=true}
+    layout["ConnectServer"]   ={Style="Button",Position={184,50},Size={80,22},Legend="Connetti",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["ConnectStatus"]   ={Style="ComboBox",Position={272,50},Size={100,22}}
+
+    -- Room layout
+    local seats = props["Seats"].Value
+    local cols  = 12
+    local rows  = math.ceil(seats/cols)
+    local room_h = rows*40+20
+    local ry = 106
+    gbox("Layout Sala / Room Layout",4,ry,888,room_h)
+    for i=1,seats do
+      local r=math.ceil(i/cols)-1
+      local c=(i-1)%cols
+      local bx=14+c*72
+      local by=ry+20+r*40
+      layout[string.format("SeatButton_%d",i)]={Style="Button",Position={bx,by},Size={30,30},Legend=tostring(i),ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+      layout[string.format("RequestLED_%d",i)]={Style="Led",Position={bx+18,by},Size={12,12},Color=C.Orn,OffColor={0,0,0},UnlinkOffColor=true}
+    end
+
+    -- Audio groupbox
+    local ay = ry + room_h + 8
+    gbox("Audio",4,ay,888,62)
+    lbl("Default Headphone vol.",14,ay+10,160,14,9)
+    layout["Defaultchannelselectorvolume"]    ={Style="Fader",Position={180,ay+8},Size={160,22},Min=0,Max=32,Orientation="Horizontal"}
+    layout["DefaultchannelselectorvolumeText"]={Style="Text",Position={346,ay+8},Size={60,22},IsReadOnly=true}
+    lbl("Speaker volume",14,ay+36,130,14,9)
+    layout["LoudSpeakervolume"]    ={Style="Fader",Position={180,ay+34},Size={160,22},Min=0,Max=25,Orientation="Horizontal"}
+    layout["LoudSpeakervolumeText"]={Style="Text",Position={346,ay+34},Size={60,22},IsReadOnly=true}
+
+    -- Riunione groupbox
+    local my = ay + 70
+    gbox("Riunione",4,my,888,86)
+    layout["MeetingType"] ={Style="Led",Position={14,my+12},Size={16,16},Color=C.Grn,OffColor=C.Red,UnlinkOffColor=true}
+    layout["MeetingTitle"]={Style="ComboBox",Position={36,my+10},Size={300,22}}
+    layout["SeatsList"]   ={Style="ListBox",Position={14,my+38},Size={420,40}}
+    lbl("Partecipanti al microfono:",446,my+10,200,14,9)
+    layout["SpeakerList"] ={Style="ListBox",Position={446,my+28},Size={430,50}}
+
+    -- Microfono groupbox
+    local micy = my + 94
+    gbox("Microfono / Mic",4,micy,888,86)
+    layout["TurnOnMic"]  ={Style="Button",Position={14,micy+14},Size={120,22},Legend="Turn On Mic",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["TurnOffMic"] ={Style="Button",Position={142,micy+14},Size={120,22},Legend="Turn Off Mic",ButtonStyle="Toggle",Color=C.Red,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["ToSpeaker"]  ={Style="Button",Position={270,micy+14},Size={120,22},Legend="To Speaker",ButtonStyle="Toggle",Color=C.Orn,OffColor=C.Gray,UnlinkOffColor=true}
+    lbl("Lista richieste:",14,micy+44,110,14,9)
+    layout["RequestList"]={Style="ListBox",Position={14,micy+58},Size={420,22}}
+
+    -- Registrazione groupbox
+    local recy = micy + 88
+    gbox("Registrazione / Recording",4,recy,888,52)
+    layout["Recording"]       ={Style="Led",Position={14,recy+18},Size={16,16},Color=C.Red,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["RecordingStatus"] ={Style="ComboBox",Position={36,recy+16},Size={200,22}}
+    layout["StartRecording"]  ={Style="Button",Position={244,recy+16},Size={140,22},Legend="Start/Stop Recording",ButtonStyle="Toggle",Color=C.Red,OffColor=C.Gray,UnlinkOffColor=true}
+
+    local dbgy = recy + 60
+    layout["debug_log"]={Style="Text",Position={0,dbgy},Size={900,16},IsReadOnly=true,FontSize=8}
+
+  -- ── Page 6: Wireless ─────────────────────────────────────────────────────────
+  elseif pg == 6 then
+    hdr("Wireless")
+    layout["Status"]          ={Style="Status",Position={2,8},Size={18,22}}
+    layout["conn_status_led"] ={Style="Led",Position={798,10},Size={14,14},Color=C.Grn,OffColor=C.Red,UnlinkOffColor=true}
+    layout["conn_status_text"]={Style="Text",Position={816,8},Size={78,18},IsReadOnly=true,FontSize=9}
+
+    gbox("Wireless",4,44,888,270)
+    layout["WirelessDeviceList"]={Style="ListBox",Position={14,60},Size={440,180}}
+    layout["GetWirelessUnits"]  ={Style="Button",Position={14,248},Size={100,22},Legend="Get Status",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["WirelessShutdown"]  ={Style="Button",Position={122,248},Size={100,22},Legend="Shutdown",ButtonStyle="Toggle",Color=C.Red,OffColor=C.Gray,UnlinkOffColor=true}
+
+    layout["debug_log"]={Style="Text",Position={0,645},Size={900,16},IsReadOnly=true,FontSize=8}
+
+  -- ── Page 7: Info ─────────────────────────────────────────────────────────────
+  elseif pg == 7 then
     hdr("Info")
     shared()
     layout["info_display"]={Style="Text",Position={50,50},Size={800,560},IsReadOnly=true,FontSize=13}
@@ -313,7 +442,10 @@ end
 if Controls then
   local rj = require("json")
 
-  PollTimer = Timer.New()
+  PollTimer     = Timer.New()
+  SeatTimer     = Timer.New()
+  MeetingTimer  = Timer.New()
+  RecordingTimer= Timer.New()
 
   local State = {
     current="NotConnected", meetingId=nil, currentItemIdx=1,
@@ -328,6 +460,33 @@ if Controls then
   local resultResPage       = 1
   local REQ_TIMEOUT = 10
 
+  -- Beta variables
+  local Port = 9443
+  local SeatId = 0
+  local SeatMoudel = { microphoneOn=false, requestingToSpeak=false }
+  local SpeakerDefaultVolume = { gain=0 }
+  local RecordingState = { state="" }
+  local Action = { action="" }
+  local RecordingType = ""
+  local LoudSpeakervolumeValue = ""
+  local DefaultchannelselectorvolumeValue = ""
+  local SpeakerListData = {}
+  local Allseat = {}
+  local AllModules = {}
+  local AllSeats = {}
+  local MeetingSeat = {}
+  local MeetingSpeakerList = {}
+  local RequestInfoList = {}
+  local RequestListByLED = {}
+  local MeetingTitleList = {}
+  local RecordingStatusList = {}
+  local DefaultchannelselectorvolumeTextList = {}
+  local LoudSpeakervolumeTextList = {}
+  local SeatListSelectedValue = ""
+  local SpeakerListSelectedValue = ""
+  local RequestListSelectedValue = ""
+  local WirelessUnits = {}
+
   local PRESETS = {
     {{label="Si/Yes",color="#00AA00"},{label="No",color="#CC0000"},{label="Astenuto/Abstain",color="#FF8800"}},
     {{label="Si/Yes",color="#00AA00"},{label="No",color="#CC0000"},{label="Astenuto/Abstain",color="#FF8800"},{label="Non votante",color="#888888"}},
@@ -335,7 +494,14 @@ if Controls then
     {{label="Si/Yes",color="#00AA00"},{label="No",color="#CC0000"},{label="Astenuto/Abstain",color="#FF8800"},{label="Non votante",color="#888888"},{label="Opzione E",color="#0055AA"},{label="Opzione F",color="#AA0055"}},
   }
 
-  -- ── Helpers ─────────────────────────────────────────────────────────────────
+  -- ── Status ───────────────────────────────────────────────────────────────────
+  local StatusState = {OK=0, COMPROMISED=1, FAULT=2, NOTPRESENT=3, MISSING=4, INITIALIZING=5}
+  local function ReportStatus(state, msg)
+    Controls["Status"].Value  = StatusState[state] or 3
+    Controls["Status"].String = msg or ""
+  end
+
+  -- ── Helpers ──────────────────────────────────────────────────────────────────
   local function Log(msg)
     local prev = Controls["debug_log"].String or ""
     local lines = {}
@@ -347,18 +513,16 @@ if Controls then
     Controls["debug_log"].String = table.concat(lines, "\n")
   end
 
-  local function GetPort()
-    return Properties["Use HTTPS"].Value and 9443 or 9080
-  end
-  local function GetScheme()
-    return Properties["Use HTTPS"].Value and "https" or "http"
-  end
   local function BuildUrl(path)
+    local scheme = Controls["ConnectStatus"].String
+    if scheme == "" then scheme = Properties["Use HTTPS"].Value and "https" or "http" end
+    Port = (scheme == "https") and 9443 or 9080
     return HttpClient.CreateUrl({
-      Host=string.format("%s://%s", GetScheme(), Properties["Server IP"].Value),
-      Port=GetPort(), Path=path,
+      Host=string.format("%s://%s", scheme, Properties["Server IP"].Value),
+      Port=Port, Path=path,
     })
   end
+
   local function AuthHdrGet()
     return {["Authorization"]="Bearer "..Properties["Bearer Token"].Value,
             ["Accept"]="application/json",["Content-Type"]="text/html"}
@@ -373,11 +537,14 @@ if Controls then
   local function HttpPost(path, data, handler)
     HttpClient.Upload({Url=BuildUrl(path),Method="POST",Data=rj.encode(data),Headers=AuthHdrPost(),Timeout=REQ_TIMEOUT,VerifyPeer=false,EventHandler=handler})
   end
+  local function HttpPut(path, data, handler)
+    HttpClient.Upload({Url=BuildUrl(path),Method="PUT",Data=rj.encode(data),Headers=AuthHdrPost(),Timeout=REQ_TIMEOUT,VerifyPeer=false,EventHandler=handler})
+  end
   local function HttpDelete(path, handler)
     HttpClient.Upload({Url=BuildUrl(path),Method="DELETE",Data="",Headers=AuthHdrGet(),Timeout=REQ_TIMEOUT,VerifyPeer=false,EventHandler=handler})
   end
 
-  -- ── State machine ────────────────────────────────────────────────────────────
+  -- ── State machine ─────────────────────────────────────────────────────────────
   local function TransitionTo(s)
     State.current = s
     Log("State -> "..s)
@@ -402,10 +569,6 @@ if Controls then
     Controls["vote_start"].IsDisabled           = not active
     Controls["vote_stop"].IsDisabled            = not voting
     Controls["vote_hide_results"].IsDisabled    = not voting
-
-    if voting then PollTimer:Start(2)
-    elseif active or ready then PollTimer:Start(5)
-    else PollTimer:Stop() end
   end
 
   local function HandleHttpError(code, err, ctx)
@@ -443,7 +606,7 @@ if Controls then
     end)
   end
 
-  -- ── UI Refresh ───────────────────────────────────────────────────────────────
+  -- ── UI Refresh ────────────────────────────────────────────────────────────────
   local function RefreshAgendaPage()
     local items  = AgendaData.items or {}
     local total  = #items
@@ -456,17 +619,17 @@ if Controls then
     for slot=1,5 do
       local idx  = offset+slot
       local itm  = items[idx]
-      Controls[string.format("odg_item_title %d",   slot)].String  = itm and string.format("%d. %s", idx, itm.title) or ""
-      Controls[string.format("odg_item_has_vote %d",slot)].Boolean = itm and itm.hasVote or false
-      Controls[string.format("odg_item_select %d",  slot)].Boolean = (selectedLogicalItem == idx) and (itm ~= nil)
-      Controls[string.format("odg_item_select %d",  slot)].IsDisabled = (itm == nil)
+      Controls[string.format("odg_item_title_%d",   slot)].String  = itm and string.format("%d. %s", idx, itm.title) or ""
+      Controls[string.format("odg_item_has_vote_%d",slot)].Boolean = itm and itm.hasVote or false
+      Controls[string.format("odg_item_select_%d",  slot)].Boolean = (selectedLogicalItem == idx) and (itm ~= nil)
+      Controls[string.format("odg_item_select_%d",  slot)].IsDisabled = (itm == nil)
     end
     local dates = {}
     for d,_ in pairs(AgendaStore) do table.insert(dates,d) end
     table.sort(dates)
     for i=1,4 do
-      Controls[string.format("odg_date_label %d",i)].String  = dates[i] or "—"
-      Controls[string.format("odg_date_select %d",i)].IsDisabled = (dates[i]==nil)
+      Controls[string.format("odg_date_label_%d",i)].String  = dates[i] or "—"
+      Controls[string.format("odg_date_select_%d",i)].IsDisabled = (dates[i]==nil)
     end
   end
 
@@ -477,8 +640,8 @@ if Controls then
       Controls["odg_detail_title"].String      = ""
       Controls["odg_detail_vote_title"].String = ""
       for m=1,6 do
-        Controls[string.format("odg_detail_choice_label %d",m)].String=""
-        Controls[string.format("odg_detail_choice_color %d",m)].String=""
+        Controls[string.format("odg_detail_choice_label_%d",m)].String=""
+        Controls[string.format("odg_detail_choice_color_%d",m)].String=""
       end
       return
     end
@@ -487,17 +650,17 @@ if Controls then
     Controls["odg_detail_vote_title"].String = (item.voting and item.voting.title) or ""
     local n = (item.voting and item.voting.numChoices) or 3
     activeVoteChoiceCount = n
-    for i=1,4 do Controls[string.format("odg_detail_vote_mode %d",i)].Boolean=(i==n-2) end
+    for i=1,4 do Controls[string.format("odg_detail_vote_mode_%d",i)].Boolean=(i==n-2) end
     for m=1,6 do
       local ch = item.voting and item.voting.choices and item.voting.choices[m]
-      Controls[string.format("odg_detail_choice_label %d",m)].String     = ch and ch.label or ""
-      Controls[string.format("odg_detail_choice_color %d",m)].String     = ch and ch.color or ""
-      Controls[string.format("odg_detail_choice_label %d",m)].IsDisabled = (m > n)
-      Controls[string.format("odg_detail_choice_color %d",m)].IsDisabled = (m > n)
+      Controls[string.format("odg_detail_choice_label_%d",m)].String     = ch and ch.label or ""
+      Controls[string.format("odg_detail_choice_color_%d",m)].String     = ch and ch.color or ""
+      Controls[string.format("odg_detail_choice_label_%d",m)].IsDisabled = (m > n)
+      Controls[string.format("odg_detail_choice_color_%d",m)].IsDisabled = (m > n)
     end
     local rv = (item.voting and item.voting.resultVisibility) or "Public"
-    Controls["odg_detail_result_vis 1"].Boolean = (rv=="Public")
-    Controls["odg_detail_result_vis 2"].Boolean = (rv=="Individual")
+    Controls[string.format("odg_detail_result_vis_%d",1)].Boolean = (rv=="Public")
+    Controls[string.format("odg_detail_result_vis_%d",2)].Boolean = (rv=="Individual")
     Controls["odg_detail_realtime"].Boolean = (item.voting and item.voting.showRealtime) or false
   end
 
@@ -510,13 +673,13 @@ if Controls then
       Controls["vote_num_choices"].String = string.format("%d scelte", n)
       for m=1,6 do
         local ch = item.voting and item.voting.choices and item.voting.choices[m]
-        Controls[string.format("vote_choice_label %d",m)].String = ch and ch.label or ""
-        Controls[string.format("vote_choice_color %d",m)].String = ch and ch.color or ""
+        Controls[string.format("vote_choice_label_%d",m)].String = ch and ch.label or ""
+        Controls[string.format("vote_choice_color_%d",m)].String = ch and ch.color or ""
       end
       local rv = (item.voting and item.voting.resultVisibility) or "Public"
-      Controls["vote_result_vis 1"].Boolean = (rv=="Public")
-      Controls["vote_result_vis 2"].Boolean = (rv=="Individual")
-      Controls["vote_realtime"].Boolean     = (item.voting and item.voting.showRealtime) or false
+      Controls[string.format("vote_result_vis_%d",1)].Boolean = (rv=="Public")
+      Controls[string.format("vote_result_vis_%d",2)].Boolean = (rv=="Individual")
+      Controls["vote_realtime"].Boolean = (item.voting and item.voting.showRealtime) or false
     else
       local t = Controls["vote_manual_title"].String
       Controls["vote_title_display"].String = t ~= "" and t or "(nessun titolo)"
@@ -532,10 +695,10 @@ if Controls then
       local ch=data.choices[m]
       local cnt = ch and (ch.count or 0) or 0
       local pct = (total>0 and ch) and math.floor(cnt/total*100+0.5) or 0
-      Controls[string.format("vote_result_label %d",m)].String = ch and (ch.label or "") or ""
-      Controls[string.format("vote_result_count %d",m)].String = ch and tostring(cnt).." voti" or ""
-      Controls[string.format("vote_result_bar %d",m)].Value    = pct
-      Controls[string.format("vote_result_pct %d",m)].String   = ch and (tostring(pct).."%") or ""
+      Controls[string.format("vote_result_label_%d",m)].String = ch and (ch.label or "") or ""
+      Controls[string.format("vote_result_count_%d",m)].String = ch and tostring(cnt).." voti" or ""
+      Controls[string.format("vote_result_bar_%d",m)].Value    = pct
+      Controls[string.format("vote_result_pct_%d",m)].String   = ch and (tostring(pct).."%") or ""
     end
   end
 
@@ -546,17 +709,18 @@ if Controls then
     local off = (resultResPage-1)*20
     for slot=1,20 do
       local r=ResultsData[off+slot]
-      Controls[string.format("res_item_title %d",  slot)].String = r and (tostring(off+slot)..". "..(r.title or "")) or ""
-      Controls[string.format("res_item_vtitle %d", slot)].String = r and (r.vtitle or "") or ""
-      Controls[string.format("res_item_summary %d",slot)].String = r and (r.summary or "") or ""
-      Controls[string.format("res_item_total %d",  slot)].String = r and tostring(r.total or 0) or ""
+      Controls[string.format("res_item_title_%d",  slot)].String = r and (tostring(off+slot)..". "..(r.title or "")) or ""
+      Controls[string.format("res_item_vtitle_%d", slot)].String = r and (r.vtitle or "") or ""
+      Controls[string.format("res_item_summary_%d",slot)].String = r and (r.summary or "") or ""
+      Controls[string.format("res_item_total_%d",  slot)].String = r and tostring(r.total or 0) or ""
     end
   end
 
-  -- ── HTTP response handlers ───────────────────────────────────────────────────
+  -- ── HTTP: Meeting / Voting (Tab 2-3-4) ───────────────────────────────────────
   local function OnGetMeeting(tbl, code, data, err, hdrs)
     if code == 200 then
       State.httpErrCount = 0
+      ReportStatus("OK")
       local ok, mtg = pcall(rj.decode, data)
       if ok and mtg then
         if mtg.meetingId then State.meetingId = mtg.meetingId end
@@ -566,15 +730,41 @@ if Controls then
         elseif not State.meetingId then
           if State.current == "NotConnected" then TransitionTo("MeetingReady") end
         end
+        -- Sync Beta meeting data
+        if mtg then
+          AllSeats = {}; MeetingTitleList = {}; MeetingSeat = {}
+          Controls["MeetingType"].Boolean = (State.meetingId ~= nil)
+          if mtg.title then
+            table.insert(MeetingTitleList, mtg.title)
+            Controls["MeetingTitle"].Choices = MeetingTitleList
+          end
+          if mtg.participants then
+            for _,v in ipairs(mtg.participants) do
+              if v.presence and v.presence.seatNumber then
+                local info = string.format("%s\t%s\t%s", v.presence.seatNumber, v.firstName or "", v.lastName or "")
+                table.insert(AllSeats, info)
+                table.insert(MeetingSeat, v.presence.seatNumber)
+              end
+            end
+          end
+          Controls["SeatsList"].Choices = AllSeats
+          Controls["TurnOnMic"].IsDisabled = (State.meetingId == nil)
+        end
       else
         if State.current == "NotConnected" then TransitionTo("MeetingReady") end
       end
     elseif code == 412 or code == 404 then
       State.httpErrCount = 0
+      Controls["MeetingType"].Boolean = false
+      Controls["MeetingTitle"].Choices = {"Riunione non avviata"}
+      Controls["SeatsList"].Choices = {}
+      Controls["TurnOnMic"].IsDisabled = true
       if State.current == "NotConnected" then TransitionTo("MeetingReady")
       elseif State.current == "MeetingActive" or State.current == "VotingActive" then
         State.meetingId=nil; TransitionTo("MeetingReady")
       end
+    elseif code == 401 then
+      ReportStatus("MISSING", "Check Bearer Token")
     else HandleHttpError(code, err, "GetMeeting") end
   end
 
@@ -608,6 +798,9 @@ if Controls then
     if code==200 or code==204 then
       State.httpErrCount=0; State.meetingId=nil
       TransitionTo("MeetingReady")
+      Controls["MeetingType"].Boolean = false
+      Controls["MeetingTitle"].Choices = {}
+      Controls["SeatsList"].Choices = {}
       Log("Riunione terminata")
     else Log("EndMeeting failed: "..tostring(code)) end
   end
@@ -653,15 +846,402 @@ if Controls then
     else Log("StopVoting failed: "..tostring(code)) end
   end
 
-  -- ── Poll ─────────────────────────────────────────────────────────────────────
+  -- ── HTTP: Seats / Mic (Beta) ──────────────────────────────────────────────────
+  local function GetDelegateInfoBySeat(id)
+    for _,v in ipairs(MeetingSeat) do
+      if v == id then
+        for _,info in ipairs(AllSeats) do
+          if string.find(info, tostring(id), 1) then return info end
+        end
+      end
+    end
+  end
+
+  local function SetSpeakerListToMeeting()
+    MeetingSpeakerList = {}
+    for _,speaker in ipairs(SpeakerListData) do
+      local info = GetDelegateInfoBySeat(speaker)
+      table.insert(MeetingSpeakerList, info or tostring(speaker))
+    end
+    Controls["SpeakerList"].Choices = MeetingSpeakerList
+  end
+
+  local function RequestGetAllSeat()
+    HttpGet("api/room/seats/discussion", function(tbl, code, data, err, hdrs)
+      if code == 200 then
+        ReportStatus("OK")
+        Allseat = {}
+        local resultStrList = {}
+        local subdata = string.sub(data, 1, string.len(data)-1)
+        local fixdata = subdata:sub(2)
+        string.gsub(fixdata, "[^,]+", function(w) table.insert(resultStrList, w) end)
+        for _,v in pairs(resultStrList) do
+          if string.find(v, "seatNumber") then
+            local seatid = string.gsub(v:sub(string.len(v)-2), ":", "")
+            table.insert(Allseat, tonumber(seatid))
+          end
+        end
+        for i=1,#Allseat do
+          local btn = Controls[string.format("SeatButton_%d",i)]
+          if btn then
+            btn.IsInvisible = false
+            btn.Legend = tostring(Allseat[i])
+          end
+        end
+      elseif code == 401 then
+        ReportStatus("MISSING","Check Bearer Token")
+      elseif err then
+        ReportStatus("FAULT", err)
+      end
+    end)
+  end
+
+  local function RequestVerfySpeaker()
+    HttpGet("api/discussion/speakers", function(tbl, code, data, err, hdrs)
+      if code == 200 then
+        ReportStatus("OK")
+        MeetingSpeakerList = {}
+        SpeakerListData = rj.decode(data) or {}
+        local seats = Properties["Seats"].Value
+        for i=1,seats do
+          local btn = Controls[string.format("SeatButton_%d",i)]
+          if btn then btn.Boolean = false end
+        end
+        for _,spk in ipairs(SpeakerListData) do
+          for i=1,#Allseat do
+            if spk == Allseat[i] then
+              local btn = Controls[string.format("SeatButton_%d",i)]
+              if btn then btn.Boolean = true end
+            end
+          end
+        end
+        SetSpeakerListToMeeting()
+      elseif code == 401 then
+        ReportStatus("MISSING","Check Bearer Token")
+      elseif err then
+        ReportStatus("FAULT", err)
+      end
+    end)
+  end
+
+  local function RequestSetMicState(isOn, seatid)
+    SeatMoudel.microphoneOn = isOn
+    SeatMoudel.requestingToSpeak = false
+    HttpPut(string.format("api/discussion/seats/%s", seatid), SeatMoudel, function(tbl,code,data,err,hdrs)
+      if code==200 then ReportStatus("OK")
+      elseif code==401 then ReportStatus("MISSING","Check Bearer Token")
+      elseif err then ReportStatus("FAULT", err) end
+    end)
+  end
+
+  local function SeatRequest(seatid)
+    SeatId = tonumber(seatid)
+    local seatnumber = 0
+    if #SpeakerListData == 0 then
+      RequestSetMicState(true, SeatId)
+      return
+    end
+    for _,v in pairs(SpeakerListData) do
+      if v == tonumber(SeatId) then seatnumber = v end
+    end
+    if seatnumber == SeatId then
+      RequestSetMicState(false, seatnumber)
+    else
+      RequestSetMicState(true, SeatId)
+    end
+  end
+
+  local function GetRequestSpeakerList()
+    HttpGet("api/discussion/requests", function(tbl, code, data, err, hdrs)
+      if code == 200 then
+        ReportStatus("OK")
+        RequestInfoList = {}
+        RequestListByLED = rj.decode(data) or {}
+        local seats = Properties["Seats"].Value
+        for i=1,seats do
+          local led = Controls[string.format("RequestLED_%d",i)]
+          if led then led.Boolean=false; led.IsInvisible=true end
+        end
+        for _,v in ipairs(RequestListByLED) do
+          for i=1,#Allseat do
+            if Allseat[i] == v then
+              local led = Controls[string.format("RequestLED_%d",i)]
+              if led then led.Boolean=true; led.IsInvisible=false end
+            end
+          end
+          local info = GetDelegateInfoBySeat(v)
+          table.insert(RequestInfoList, info or tostring(v))
+        end
+        Controls["RequestList"].Choices = RequestInfoList
+      elseif code == 401 then
+        ReportStatus("MISSING","Check Bearer Token")
+      elseif err then
+        ReportStatus("FAULT", err)
+      end
+    end)
+  end
+
+  -- ── HTTP: Volume (Beta) ───────────────────────────────────────────────────────
+  local function ChangeSpeakerVolume(volume)
+    if volume <= 120 and volume > 110 then return 25
+    elseif volume <= 110 and volume > 100 then return 24
+    elseif volume <= 100 and volume > 90  then return 23
+    elseif volume <= 90  and volume > 80  then return 22
+    elseif volume <= 80  and volume > 70  then return 21
+    elseif volume <= 70  and volume > 60  then return 20
+    elseif volume <= 60  and volume > 50  then return 19
+    elseif volume <= 50  and volume > 40  then return 18
+    elseif volume <= 40  and volume > 30  then return 17
+    elseif volume <= 30  and volume > 20  then return 16
+    elseif volume <= 20  and volume > 10  then return 15
+    elseif volume <= 10  and volume > 0   then return 14
+    elseif volume <= 0   and volume > -20 then return 13
+    elseif volume <= -20 and volume > -40 then return 12
+    elseif volume <= -40 and volume > -60 then return 11
+    elseif volume <= -60 and volume > -80 then return 10
+    elseif volume <= -80 and volume > -100 then return 9
+    elseif volume <= -100 and volume > -120 then return 8
+    elseif volume <= -120 and volume > -140 then return 7
+    elseif volume <= -140 and volume > -160 then return 6
+    elseif volume <= -160 and volume > -180 then return 5
+    elseif volume <= -180 and volume > -200 then return 4
+    elseif volume <= -200 and volume > -220 then return 3
+    elseif volume <= -220 and volume > -240 then return 2
+    elseif volume <= -240 and volume > -960 then return 1
+    else return 0 end
+  end
+
+  local function ChangeBackSpeakerVolume(volume)
+    local t={[25]=120,[24]=110,[23]=100,[22]=90,[21]=80,[20]=70,[19]=60,[18]=50,
+             [17]=40,[16]=30,[15]=20,[14]=10,[13]=0,[12]=-20,[11]=-40,[10]=-60,
+             [9]=-80,[8]=-100,[7]=-120,[6]=-140,[5]=-160,[4]=-180,[3]=-200,[2]=-220,[1]=-240,[0]=-960}
+    return t[volume] or 0
+  end
+
+  local function ChangeDefaultVolume(volume)
+    local t={[110]=32,[100]=31,[90]=30,[80]=29,[70]=28,[60]=27,[50]=26,[40]=25,
+             [30]=24,[20]=23,[10]=22,[0]=21,[-10]=20,[-20]=19,[-30]=18,[-40]=17,
+             [-50]=16,[-60]=15,[-70]=14,[-80]=13,[-90]=12,[-100]=11,[-110]=10,
+             [-120]=9,[-130]=8,[-140]=7,[-150]=6,[-160]=5,[-170]=4,[-180]=3,
+             [-190]=2,[-200]=1,[-1000]=0}
+    return t[volume] or 0
+  end
+
+  local function ChnageBackDefaultVolume(volume)
+    local t={[0]=-1000,[1]=-200,[2]=-190,[3]=-180,[4]=-170,[5]=-160,[6]=-150,
+             [7]=-140,[8]=-130,[9]=-120,[10]=-110,[11]=-100,[12]=-90,[13]=-80,
+             [14]=-70,[15]=-60,[16]=-50,[17]=-40,[18]=-30,[19]=-20,[20]=-10,
+             [21]=0,[22]=10,[23]=20,[24]=30,[25]=40,[26]=50,[27]=60,[28]=70,
+             [29]=80,[30]=90,[31]=100,[32]=110}
+    return t[volume] or 0
+  end
+
+  local function ApplyVolume()
+    local scheme = Controls["ConnectStatus"].String
+    if scheme == "" then scheme = "https" end
+    local url = HttpClient.CreateUrl({
+      Host=string.format("%s://%s", scheme, Properties["Server IP"].Value),
+      Port=9012, Path="api/v1/audio/defaultchannelselectorvolume/apply",
+    })
+    HttpClient.Upload({Url=url, Data="", Method="POST",
+      Headers={["Accept"]="accept: */*",["Content-Type"]="application/json"},
+      Timeout=REQ_TIMEOUT,
+      EventHandler=function(tbl,code,data,err,hdrs)
+        if code==200 then ReportStatus("OK")
+        elseif code==401 then ReportStatus("MISSING","Check Bearer Token")
+        elseif err and code~=415 then ReportStatus("FAULT",err) end
+      end
+    })
+  end
+
+  local function RequestGetDefaultVolume()
+    HttpGet("api/audio/defaultchannelselectorvolume", function(tbl,code,data,err,hdrs)
+      if code==200 then
+        ReportStatus("OK")
+        local tabdata = rj.decode(data)
+        local val = ChangeDefaultVolume(tabdata["gain"])
+        DefaultchannelselectorvolumeValue = val
+        Controls["Defaultchannelselectorvolume"].String = val
+        DefaultchannelselectorvolumeTextList = {val}
+        Controls["DefaultchannelselectorvolumeText"].Choices = DefaultchannelselectorvolumeTextList
+      elseif code==401 then ReportStatus("MISSING","Check Bearer Token")
+      elseif err then ReportStatus("FAULT",err) end
+    end)
+  end
+
+  local function RequestGetSpeakerVolume()
+    HttpGet("api/audio/loudspeakervolume", function(tbl,code,data,err,hdrs)
+      if code==200 then
+        ReportStatus("OK")
+        local tabdata = rj.decode(data)
+        local val = ChangeSpeakerVolume(tonumber(tabdata["gain"]))
+        LoudSpeakervolumeValue = val
+        Controls["LoudSpeakervolume"].String = val
+        LoudSpeakervolumeTextList = {val}
+        Controls["LoudSpeakervolumeText"].Choices = LoudSpeakervolumeTextList
+      elseif code==401 then ReportStatus("MISSING","Check Bearer Token")
+      elseif err then ReportStatus("FAULT",err) end
+    end)
+  end
+
+  local function RequestSetDefaultVolume()
+    SpeakerDefaultVolume.gain = ChnageBackDefaultVolume(tonumber(Controls["Defaultchannelselectorvolume"].Value))
+    HttpPut("api/audio/defaultchannelselectorvolume", SpeakerDefaultVolume, function(tbl,code,data,err,hdrs)
+      if code==200 then ReportStatus("OK"); RequestGetDefaultVolume()
+      elseif code==401 then ReportStatus("MISSING","Check Bearer Token")
+      elseif err then ReportStatus("FAULT",err) end
+    end)
+  end
+
+  local function RequestSetSpeakerVolume()
+    SpeakerDefaultVolume.gain = ChangeBackSpeakerVolume(tonumber(Controls["LoudSpeakervolume"].String))
+    HttpPut("api/audio/loudspeakervolume", SpeakerDefaultVolume, function(tbl,code,data,err,hdrs)
+      if code==200 then ReportStatus("OK"); RequestGetSpeakerVolume()
+      elseif code==401 then ReportStatus("MISSING","Check Bearer Token")
+      elseif err then ReportStatus("FAULT",err) end
+    end)
+  end
+
+  -- ── HTTP: Recording (Beta) ────────────────────────────────────────────────────
+  local function GetRecording()
+    HttpGet("api/recording/state", function(tbl,code,data,err,hdrs)
+      if code==200 then
+        ReportStatus("OK")
+        local rs = rj.decode(data)
+        RecordingStatusList = {}
+        if rs and rs.state == "recording" then
+          table.insert(RecordingStatusList, "Recording")
+          RecordingType = "Recording"
+          Controls["Recording"].Boolean = true
+          Controls["StartRecording"].Boolean = true
+          Controls["StartRecording"].Legend  = "Stop Recording"
+        elseif rs and rs.state == "idle" then
+          table.insert(RecordingStatusList, "Idle")
+          RecordingType = "Idle"
+          Controls["Recording"].Boolean = false
+          Controls["StartRecording"].Boolean = false
+          Controls["StartRecording"].Legend  = "Start Recording"
+        end
+        Controls["RecordingStatus"].Choices = RecordingStatusList
+      elseif code==401 then
+        ReportStatus("MISSING","Check Bearer Token")
+      elseif code==405 or code==404 then
+        Controls["RecordingStatus"].Choices = {"No Recording feature available"}
+        Controls["StartRecording"].Boolean = false
+        Controls["StartRecording"].Legend = "Start Recording"
+      elseif err then ReportStatus("FAULT",err) end
+    end)
+  end
+
+  local function SetRecording()
+    RecordingState.state = (RecordingType=="Recording") and "idle" or "recording"
+    HttpPut("api/recording/state", RecordingState, function(tbl,code,data,err,hdrs)
+      if code==200 then ReportStatus("OK")
+      elseif code==401 then ReportStatus("MISSING","Check Bearer Token")
+      elseif err then ReportStatus("FAULT",err) end
+    end)
+  end
+
+  -- ── HTTP: Wireless (Beta) ────────────────────────────────────────────────────
+  local function GetWirelessDevices()
+    HttpGet("api/device/devices", function(tbl,code,data,err,hdrs)
+      if code==200 then
+        ReportStatus("OK")
+        local WirelessUnitList = {}
+        for _,v in ipairs(rj.decode(data) or {}) do
+          if v.deviceType=="confideaG4Flex" or v.deviceType=="confideaG4Go" then
+            table.insert(WirelessUnitList, string.format("%s - %s [%s]", v.deviceType, v.serial or "?", v.state or "?"))
+          end
+        end
+        Controls["WirelessDeviceList"].Choices = WirelessUnitList
+      elseif code==401 then ReportStatus("MISSING","Check Bearer Token")
+      elseif err then ReportStatus("FAULT",err) end
+    end)
+  end
+
+  local function ShutdownWirelessUnits()
+    Action.action = "turnOff"
+    local scheme = Controls["ConnectStatus"].String
+    if scheme == "" then scheme = "https" end
+    local p = (scheme=="https") and 9443 or 9080
+    local url = HttpClient.CreateUrl({
+      Host=string.format("%s://%s", scheme, Properties["Server IP"].Value),
+      Port=p, Path="api/device/devices/actions",
+    })
+    HttpClient.Upload({Url=url, Data=rj.encode(Action), Method="POST",
+      Headers={["Accept"]="accept: */*",["Authorization"]="Bearer "..Properties["Bearer Token"].Value,["Content-Type"]="application/json"},
+      Timeout=REQ_TIMEOUT,
+      EventHandler=function(tbl,code,data,err,hdrs)
+        if code==200 then ReportStatus("OK")
+        elseif code==401 then ReportStatus("MISSING","Check Bearer Token")
+        elseif err then ReportStatus("FAULT",err) end
+      end
+    })
+  end
+
+  -- ── Timer callbacks ───────────────────────────────────────────────────────────
   PollTimer.EventHandler = function()
+    HttpGet("api/audio/loudspeakervolume", function(tbl,code,data,err,hdrs)
+      if code==200 then
+        local tabdata = rj.decode(data)
+        local val = ChangeSpeakerVolume(tonumber(tabdata["gain"]))
+        if LoudSpeakervolumeValue ~= val then
+          Controls["LoudSpeakervolume"].String = val
+          LoudSpeakervolumeTextList = {val}
+          Controls["LoudSpeakervolumeText"].Choices = LoudSpeakervolumeTextList
+          LoudSpeakervolumeValue = val
+        end
+      end
+    end)
+    HttpGet("api/audio/defaultchannelselectorvolume", function(tbl,code,data,err,hdrs)
+      if code==200 then
+        local tabdata = rj.decode(data)
+        local val = ChangeDefaultVolume(tabdata["gain"])
+        if DefaultchannelselectorvolumeValue ~= val then
+          Controls["Defaultchannelselectorvolume"].String = val
+          DefaultchannelselectorvolumeTextList = {val}
+          Controls["DefaultchannelselectorvolumeText"].Choices = DefaultchannelselectorvolumeTextList
+          DefaultchannelselectorvolumeValue = val
+        end
+      end
+    end)
+  end
+
+  SeatTimer.EventHandler = function()
+    RequestVerfySpeaker()
+  end
+
+  MeetingTimer.EventHandler = function()
     HttpGet("api/meeting", OnGetMeeting)
+    GetRequestSpeakerList()
     if State.votingActive then
       HttpGet("api/meeting/voting-results", OnGetVotingResults)
     end
   end
 
-  -- ── Business actions ─────────────────────────────────────────────────────────
+  RecordingTimer.EventHandler = function()
+    GetRecording()
+  end
+
+  -- ── Initialize ───────────────────────────────────────────────────────────────
+  local function StopAllTimers()
+    PollTimer:Stop(); SeatTimer:Stop(); MeetingTimer:Stop(); RecordingTimer:Stop()
+  end
+
+  local function Initialize()
+    ReportStatus("INITIALIZING", "Connessione...")
+    RequestGetAllSeat()
+    RequestGetSpeakerVolume()
+    RequestGetDefaultVolume()
+    HttpGet("api/meeting", OnGetMeeting)
+    PollTimer:Start(0.5)
+    SeatTimer:Start(0.5)
+    MeetingTimer:Start(2)
+    RecordingTimer:Start(0.5)
+    Log("Initialize: connessione avviata")
+  end
+
+  -- ── Business actions ──────────────────────────────────────────────────────────
   local function StartMeeting()
     if State.current ~= "MeetingReady" then return end
     HttpPost("api/meeting", {title=AgendaData.title or "", date=AgendaData.date or ""}, OnStartMeeting)
@@ -691,11 +1271,11 @@ if Controls then
       votingTitle=Controls["vote_manual_title"].String
       choices={}
       for m=1,6 do
-        local l=Controls[string.format("vote_choice_label %d",m)].String
-        local c=Controls[string.format("vote_choice_color %d",m)].String
+        local l=Controls[string.format("vote_choice_label_%d",m)].String
+        local c=Controls[string.format("vote_choice_color_%d",m)].String
         if l~="" then table.insert(choices,{number=#choices+1,label=l,color=c}) end
       end
-      resultVis=Controls["vote_result_vis 1"].Boolean and "Public" or "Individual"
+      resultVis=Controls[string.format("vote_result_vis_%d",1)].Boolean and "Public" or "Individual"
       showRT=Controls["vote_realtime"].Boolean
     end
     HttpPost("api/meeting/actions",{
@@ -740,6 +1320,21 @@ if Controls then
   end
 
   -- ── Event handlers ────────────────────────────────────────────────────────────
+  Controls["ConnectServer"].EventHandler = function(ctl)
+    if ctl.Boolean then
+      Initialize()
+    else
+      StopAllTimers()
+      TransitionTo("NotConnected")
+      ReportStatus("NOTPRESENT")
+      Log("Disconnesso")
+    end
+  end
+
+  Controls["ConnectStatus"].EventHandler = function(ctl)
+    Port = (ctl.String == "https") and 9443 or 9080
+  end
+
   Controls["mtg_start"].EventHandler            = StartMeeting
   Controls["mtg_end"].EventHandler              = EndMeeting
   Controls["vote_start"].EventHandler           = StartVoting
@@ -751,9 +1346,9 @@ if Controls then
 
   Controls["vote_hide_results"].EventHandler = function()
     for m=1,6 do
-      Controls[string.format("vote_result_count %d",m)].String=""
-      Controls[string.format("vote_result_bar %d",m)].Value=0
-      Controls[string.format("vote_result_pct %d",m)].String=""
+      Controls[string.format("vote_result_count_%d",m)].String=""
+      Controls[string.format("vote_result_bar_%d",m)].Value=0
+      Controls[string.format("vote_result_pct_%d",m)].String=""
     end
     Controls["vote_total_votes"].String=""
   end
@@ -821,17 +1416,17 @@ if Controls then
 
   for slot=1,5 do
     local s=slot
-    Controls[string.format("odg_item_select %d",s)].EventHandler = function(ctl)
+    Controls[string.format("odg_item_select_%d",s)].EventHandler = function(ctl)
       local idx=(currentAgendaPage-1)*5+s
       if ctl.Boolean then
         selectedLogicalItem=idx
-        for os=1,5 do if os~=s then Controls[string.format("odg_item_select %d",os)].Boolean=false end end
+        for os=1,5 do if os~=s then Controls[string.format("odg_item_select_%d",os)].Boolean=false end end
         RefreshDetailPanel()
       else
         selectedLogicalItem=0; RefreshDetailPanel()
       end
     end
-    Controls[string.format("odg_item_has_vote %d",s)].EventHandler = function(ctl)
+    Controls[string.format("odg_item_has_vote_%d",s)].EventHandler = function(ctl)
       local idx=(currentAgendaPage-1)*5+s
       if AgendaData.items and AgendaData.items[idx] then AgendaData.items[idx].hasVote=ctl.Boolean end
     end
@@ -850,11 +1445,11 @@ if Controls then
 
   for i=1,4 do
     local n=i
-    Controls[string.format("odg_detail_vote_mode %d",n)].EventHandler = function(ctl)
+    Controls[string.format("odg_detail_vote_mode_%d",n)].EventHandler = function(ctl)
       if ctl.Boolean and selectedLogicalItem>0 and AgendaData.items and AgendaData.items[selectedLogicalItem] then
         activeVoteChoiceCount=n+2
         AgendaData.items[selectedLogicalItem].voting.numChoices=activeVoteChoiceCount
-        for oi=1,4 do if oi~=n then Controls[string.format("odg_detail_vote_mode %d",oi)].Boolean=false end end
+        for oi=1,4 do if oi~=n then Controls[string.format("odg_detail_vote_mode_%d",oi)].Boolean=false end end
         RefreshDetailPanel()
       end
     end
@@ -873,14 +1468,14 @@ if Controls then
 
   for m=1,6 do
     local mm=m
-    Controls[string.format("odg_detail_choice_label %d",mm)].EventHandler = function(ctl)
+    Controls[string.format("odg_detail_choice_label_%d",mm)].EventHandler = function(ctl)
       if selectedLogicalItem>0 and AgendaData.items and AgendaData.items[selectedLogicalItem] then
         local v=AgendaData.items[selectedLogicalItem].voting
         if not v.choices[mm] then v.choices[mm]={label="",color="#888888"} end
         v.choices[mm].label=ctl.String
       end
     end
-    Controls[string.format("odg_detail_choice_color %d",mm)].EventHandler = function(ctl)
+    Controls[string.format("odg_detail_choice_color_%d",mm)].EventHandler = function(ctl)
       if selectedLogicalItem>0 and AgendaData.items and AgendaData.items[selectedLogicalItem] then
         local v=AgendaData.items[selectedLogicalItem].voting
         if not v.choices[mm] then v.choices[mm]={label="",color="#888888"} end
@@ -891,10 +1486,10 @@ if Controls then
 
   for rv=1,2 do
     local r=rv
-    Controls[string.format("odg_detail_result_vis %d",r)].EventHandler = function(ctl)
+    Controls[string.format("odg_detail_result_vis_%d",r)].EventHandler = function(ctl)
       if ctl.Boolean and selectedLogicalItem>0 and AgendaData.items and AgendaData.items[selectedLogicalItem] then
         AgendaData.items[selectedLogicalItem].voting.resultVisibility=(r==1) and "Public" or "Individual"
-        Controls[string.format("odg_detail_result_vis %d",3-r)].Boolean=false
+        Controls[string.format("odg_detail_result_vis_%d",3-r)].Boolean=false
       end
     end
   end
@@ -926,15 +1521,15 @@ if Controls then
   end
 
   Controls["odg_new_agenda"].EventHandler = function()
-    AgendaData={title="Nuova Riunione",date=os.date("%Y-%m-%d"),items={}}
+    AgendaData={title="Nuova Riunione",date=os.date("%d/%m/%Y"),items={}}
     currentAgendaPage=1; selectedLogicalItem=0
     RefreshAgendaPage(); RefreshDetailPanel()
   end
 
   for i=1,4 do
     local ii=i
-    Controls[string.format("odg_date_select %d",ii)].EventHandler = function()
-      local d=Controls[string.format("odg_date_label %d",ii)].String
+    Controls[string.format("odg_date_select_%d",ii)].EventHandler = function()
+      local d=Controls[string.format("odg_date_label_%d",ii)].String
       if d and d~="—" and AgendaStore[d] then
         AgendaData={title=AgendaStore[d].title or "",date=d,items=AgendaStore[d].items or {}}
         currentAgendaPage=1; selectedLogicalItem=0
@@ -972,9 +1567,58 @@ if Controls then
     if resultResPage<pages then resultResPage=resultResPage+1; RefreshResultsTab() end
   end
 
+  -- Seat buttons (closure bug fixed)
+  local maxSeats = Properties["Seats"].Value
+  for i=1,maxSeats do
+    local idx=i
+    local btn = Controls[string.format("SeatButton_%d",idx)]
+    if btn then
+      btn.EventHandler = function()
+        if Allseat[idx] == nil then return end
+        SeatRequest(Allseat[idx])
+      end
+    end
+  end
+
+  -- Volume handlers
+  Controls["Defaultchannelselectorvolume"].EventHandler = function(ctl)
+    DefaultchannelselectorvolumeTextList = {ctl.Value}
+    Controls["DefaultchannelselectorvolumeText"].Choices = DefaultchannelselectorvolumeTextList
+    RequestSetDefaultVolume()
+    ApplyVolume()
+  end
+
+  Controls["LoudSpeakervolume"].EventHandler = function(ctl)
+    LoudSpeakervolumeTextList = {ctl.Value}
+    Controls["LoudSpeakervolumeText"].Choices = LoudSpeakervolumeTextList
+    RequestSetSpeakerVolume()
+  end
+
+  -- Mic handlers
+  Controls["TurnOnMic"].EventHandler  = function() SeatMoudel.microphoneOn=true;  RequestSetMicState(true,  SeatListSelectedValue) end
+  Controls["TurnOffMic"].EventHandler = function() SeatMoudel.microphoneOn=false; RequestSetMicState(false, SpeakerListSelectedValue) end
+  Controls["ToSpeaker"].EventHandler  = function() SeatMoudel.microphoneOn=true;  RequestSetMicState(true,  RequestListSelectedValue) end
+
+  -- List selection handlers
+  Controls["SeatsList"].EventHandler    = function(ctl) SeatListSelectedValue    = ctl.String end
+  Controls["SpeakerList"].EventHandler  = function(ctl) SpeakerListSelectedValue = ctl.String end
+  Controls["RequestList"].EventHandler  = function(ctl) RequestListSelectedValue = ctl.String end
+
+  -- Recording / Wireless handlers
+  Controls["StartRecording"].EventHandler  = SetRecording
+  Controls["GetWirelessUnits"].EventHandler = GetWirelessDevices
+  Controls["WirelessShutdown"].EventHandler = ShutdownWirelessUnits
+
   -- ── Init ─────────────────────────────────────────────────────────────────────
   LoadFromFile()
+  ReportStatus("NOTPRESENT")
   TransitionTo("NotConnected")
+
+  Controls["ConnectStatus"].Choices = {"https","http"}
+  Controls["ConnectStatus"].String  = Properties["Use HTTPS"].Value and "https" or "http"
+  Port = Properties["Use HTTPS"].Value and 9443 or 9080
+
+  Controls["StartRecording"].Legend = "Start Recording"
 
   Controls["info_display"].String = string.format(
     "Plugin: Confero Agenda Manager\nVersione: %s\nAutore: Matteo Fioretto\nPer: Prase, a Midwich company\nSistemi: Plixus, G4\nAPI: Confero REST v7.17\n\n© 2026 Tutti i diritti riservati",
@@ -986,5 +1630,4 @@ if Controls then
   RefreshVotingPanel()
 
   HttpGet("api/meeting", OnGetMeeting)
-  PollTimer:Start(5)
 end
