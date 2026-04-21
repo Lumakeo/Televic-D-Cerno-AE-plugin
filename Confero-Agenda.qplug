@@ -1,0 +1,990 @@
+PluginInfo = {
+  Name        = "Confero~Agenda Manager",
+  Version     = "1.0.0",
+  Id          = "Confero.AgendaManager.v1",
+  Description = "Gestione ordine del giorno e votazioni – Televic Confero (Plixus/G4)",
+  Author      = "Matteo Fioretto – Prase, a Midwich company"
+}
+
+function GetColor(props) return {40, 40, 40} end
+function GetPrettyName(props) return "Confero Agenda v" .. PluginInfo.Version end
+
+local C = {
+  TV={166,207,57}, Dark={30,30,30}, Gray={80,80,80}, LtGy={153,153,153},
+  Wht={255,255,255}, Grn={0,180,0}, Red={200,0,0}, Orn={220,140,0},
+  Blu={0,120,200}, Hdr={45,55,70},
+}
+
+function GetProperties()
+  return {
+    { Name="System Type",    Type="enum",    Choices={"Plixus","G4"}, Value="Plixus" },
+    { Name="Server IP",      Type="string",  Value="192.168.1.1" },
+    { Name="Use HTTPS",      Type="boolean", Value=true },
+    { Name="Bearer Token",   Type="string",  Value="" },
+    { Name="Data File Path", Type="string",  Value="agendas.json" },
+  }
+end
+
+function GetPages(props)
+  return {
+    { name="Ordine del Giorno / Agenda" },
+    { name="Riunione / Meeting" },
+    { name="Votazione / Voting" },
+    { name="Risultati / Results" },
+    { name="Info" },
+  }
+end
+
+function GetControls(props)
+  local ctrls = {}
+  local function add(t) table.insert(ctrls, t) end
+  -- System
+  add{Name="conn_status_led",  ControlType="Indicator",IndicatorType="Led",PinStyle="Output",UserPin=true,Count=1}
+  add{Name="conn_status_text", ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="debug_log",        ControlType="Text",PinStyle="Output",UserPin=true,Count=1}
+  -- Tab 1
+  add{Name="odg_meeting_title",      ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_meeting_date",       ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_new_agenda",         ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_save_agenda",        ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_load_agenda",        ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_date_select",        ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=4}
+  add{Name="odg_date_label",         ControlType="Text",PinStyle="Both",UserPin=true,Count=4}
+  add{Name="odg_page_prev",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_page_next",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_page_indicator",     ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_add_item",           ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_remove_item",        ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_move_up",            ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_move_down",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_item_title",         ControlType="Text",PinStyle="Both",UserPin=true,Count=5}
+  add{Name="odg_item_select",        ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=5}
+  add{Name="odg_item_has_vote",      ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=5}
+  add{Name="odg_selected_label",     ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_detail_title",       ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_detail_vote_title",  ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_detail_vote_mode",   ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=4}
+  add{Name="odg_detail_preset",      ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_detail_choice_label",ControlType="Text",PinStyle="Both",UserPin=true,Count=6}
+  add{Name="odg_detail_choice_color",ControlType="Text",PinStyle="Both",UserPin=true,Count=6}
+  add{Name="odg_detail_result_vis",  ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=2}
+  add{Name="odg_detail_realtime",    ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_json_export",        ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_json_import",        ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_do_export",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_do_import",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  -- Tab 2
+  add{Name="mtg_status_led",         ControlType="Indicator",IndicatorType="Led",PinStyle="Output",UserPin=true,Count=1}
+  add{Name="mtg_status_text",        ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="mtg_start",              ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="mtg_end",                ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="mtg_current_item_text",  ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="mtg_current_item_num",   ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="mtg_prev_item",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="mtg_next_item",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="mtg_start_discussion",   ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="mtg_stop_discussion",    ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="mtg_discussion_status",  ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  -- Tab 3
+  add{Name="vote_status_led",        ControlType="Indicator",IndicatorType="Led",PinStyle="Output",UserPin=true,Count=1}
+  add{Name="vote_status_text",       ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="vote_use_config",        ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="vote_title_display",     ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="vote_manual_title",      ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="vote_choice_label",      ControlType="Text",PinStyle="Both",UserPin=true,Count=6}
+  add{Name="vote_choice_color",      ControlType="Text",PinStyle="Both",UserPin=true,Count=6}
+  add{Name="vote_num_choices",       ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="vote_result_vis",        ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=2}
+  add{Name="vote_realtime",          ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="vote_start",             ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="vote_stop",              ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="vote_hide_results",      ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="vote_result_label",      ControlType="Text",PinStyle="Both",UserPin=true,Count=6}
+  add{Name="vote_result_count",      ControlType="Text",PinStyle="Both",UserPin=true,Count=6}
+  add{Name="vote_result_bar",        ControlType="Knob",ControlUnit="Float",Min=0,Max=100,PinStyle="Both",UserPin=true,Count=6}
+  add{Name="vote_result_pct",        ControlType="Text",PinStyle="Both",UserPin=true,Count=6}
+  add{Name="vote_total_votes",       ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  -- Tab 4
+  add{Name="res_item_title",         ControlType="Text",PinStyle="Both",UserPin=true,Count=20}
+  add{Name="res_item_vtitle",        ControlType="Text",PinStyle="Both",UserPin=true,Count=20}
+  add{Name="res_item_summary",       ControlType="Text",PinStyle="Both",UserPin=true,Count=20}
+  add{Name="res_item_total",         ControlType="Text",PinStyle="Both",UserPin=true,Count=20}
+  add{Name="res_clear",              ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="res_page_prev",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="res_page_next",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="res_page_indicator",     ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  -- Tab 5
+  add{Name="info_display", ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  return ctrls
+end
+
+function GetControlLayout(props)
+  local layout   = {}
+  local graphics = {}
+  local pg = props["page_index"].Value
+
+  local function hdr(txt)
+    table.insert(graphics,{Type="GroupBox",Fill=C.Hdr,StrokeWidth=0,CornerRadius=0,Position={0,0},Size={900,38}})
+    table.insert(graphics,{Type="Label",Text=txt,Font="Lato",FontStyle="Bold",FontSize=14,Color=C.TV,HTextAlign="Left",Position={10,8},Size={780,22}})
+  end
+  local function lbl(txt,x,y,w,h,sz,col,align)
+    table.insert(graphics,{Type="Label",Text=txt,FontSize=sz or 10,Color=col or C.LtGy,HTextAlign=align or "Left",Position={x,y},Size={w,h}})
+  end
+  local function sep(y)
+    table.insert(graphics,{Type="GroupBox",Fill=C.Gray,StrokeWidth=0,Position={0,y},Size={900,1}})
+  end
+  local function shared(pg_arg)
+    layout["conn_status_led"] ={Style="Led",Position={798,10},Size={14,14},Color=C.Grn,OffColor=C.Red,UnlinkOffColor=true}
+    layout["conn_status_text"]={Style="Text",Position={816,8},Size={78,18},IsReadOnly=true,FontSize=9}
+    layout["debug_log"]       ={Style="Text",Position={0,645},Size={900,16},IsReadOnly=true,FontSize=8}
+  end
+
+  if pg == 1 then
+    hdr("Ordine del Giorno / Agenda")
+    shared()
+
+    lbl("Titolo Riunione",10,44,100,14,9)
+    layout["odg_meeting_title"]={Style="Text",Position={10,58},Size={340,22}}
+    lbl("Data (YYYY-MM-DD)",358,44,130,14,9)
+    layout["odg_meeting_date"]={Style="Text",Position={358,58},Size={130,22}}
+    layout["odg_save_agenda"] ={Style="Button",Position={496,57},Size={92,24},Legend="Salva",Color=C.Blu}
+    layout["odg_load_agenda"] ={Style="Button",Position={594,57},Size={92,24},Legend="Carica"}
+    layout["odg_new_agenda"]  ={Style="Button",Position={692,57},Size={92,24},Legend="Nuovo OdG",Color=C.Orn}
+
+    lbl("Date salvate:",10,87,90,14,9)
+    for i=1,4 do
+      local x=100+(i-1)*198
+      layout[string.format("odg_date_label %d",i)]  ={Style="Text",Position={x,85},Size={120,18},IsReadOnly=true}
+      layout[string.format("odg_date_select %d",i)]  ={Style="Button",Position={x+122,83},Size={72,22},Legend="Carica"}
+    end
+
+    sep(107)
+    lbl("N°",10,112,30,14,9,C.TV)
+    lbl("Titolo Punto / Item Title",44,112,490,14,9,C.TV)
+    lbl("Voto?",540,112,60,14,9,C.TV)
+    lbl("Sel.",608,112,60,14,9,C.TV)
+
+    for i=1,5 do
+      local y=128+(i-1)*36
+      layout[string.format("odg_item_title %d",i)]   ={Style="Text",Position={44,y},Size={490,22},IsReadOnly=true}
+      layout[string.format("odg_item_has_vote %d",i)] ={Style="Button",Position={540,y},Size={60,22},Legend="V",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+      layout[string.format("odg_item_select %d",i)]   ={Style="Button",Position={608,y},Size={60,22},Legend="Sel.",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+    end
+
+    layout["odg_page_prev"]     ={Style="Button",Position={10,316},Size={80,24},Legend="◀ Prec."}
+    layout["odg_page_indicator"]={Style="Text",Position={96,316},Size={160,24},IsReadOnly=true}
+    layout["odg_page_next"]     ={Style="Button",Position={262,316},Size={80,24},Legend="Succ. ▶"}
+    layout["odg_add_item"]      ={Style="Button",Position={370,316},Size={110,24},Legend="+ Aggiungi",Color=C.Grn}
+    layout["odg_remove_item"]   ={Style="Button",Position={486,316},Size={110,24},Legend="- Rimuovi",Color=C.Red}
+    layout["odg_move_up"]       ={Style="Button",Position={602,316},Size={60,24},Legend="Su"}
+    layout["odg_move_down"]     ={Style="Button",Position={668,316},Size={60,24},Legend="Giu"}
+
+    sep(348)
+    layout["odg_selected_label"]   ={Style="Text",Position={10,354},Size={880,18},IsReadOnly=true}
+    lbl("Titolo punto:",10,378,90,14,9)
+    layout["odg_detail_title"]     ={Style="Text",Position={10,392},Size={878,22}}
+    lbl("Titolo votazione:",10,420,100,14,9)
+    layout["odg_detail_vote_title"]={Style="Text",Position={10,434},Size={878,22}}
+
+    lbl("Scelte:",10,462,50,14,9)
+    for i=1,4 do
+      layout[string.format("odg_detail_vote_mode %d",i)]={Style="Button",Position={62+(i-1)*58,460},Size={54,22},Legend=tostring(i+2).." sc.",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+    end
+    layout["odg_detail_preset"]={Style="Button",Position={300,460},Size={90,22},Legend="Preset",Color=C.TV}
+
+    for i=1,6 do
+      local row=math.ceil(i/2); local col=((i-1)%2)
+      local bx=10+col*440; local by=488+(row-1)*22
+      layout[string.format("odg_detail_choice_label %d",i)]={Style="Text",Position={bx,by},Size={200,18}}
+      layout[string.format("odg_detail_choice_color %d",i)]={Style="Text",Position={bx+205,by},Size={80,18}}
+    end
+    lbl("Scelte 1-6 / label + colore hex",10,476,400,12,8)
+
+    layout["odg_detail_result_vis 1"]={Style="Button",Position={740,488},Size={75,18},Legend="Pubbl.",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["odg_detail_result_vis 2"]={Style="Button",Position={740,510},Size={75,18},Legend="Indiv.",ButtonStyle="Toggle",Color=C.Orn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["odg_detail_realtime"]    ={Style="Button",Position={820,488},Size={68,40},Legend="Realtime",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+
+    sep(556)
+    lbl("Export JSON:",10,561,80,12,9)
+    layout["odg_json_export"]={Style="Text",Position={10,574},Size={420,50}}
+    layout["odg_do_export"]  ={Style="Button",Position={10,628},Size={110,20},Legend="Genera Export"}
+    lbl("Import JSON:",440,561,80,12,9)
+    layout["odg_json_import"]={Style="Text",Position={440,574},Size={448,50}}
+    layout["odg_do_import"]  ={Style="Button",Position={440,628},Size={110,20},Legend="Importa",Color=C.Blu}
+
+  elseif pg == 2 then
+    hdr("Riunione / Meeting")
+    shared()
+
+    layout["mtg_status_led"] ={Style="Led",Position={10,50},Size={16,16},Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["mtg_status_text"]={Style="Text",Position={30,48},Size={260,20},IsReadOnly=true}
+    layout["mtg_start"]      ={Style="Button",Position={10,76},Size={180,36},Legend="▶ Avvia Riunione",Color=C.Grn}
+    layout["mtg_end"]        ={Style="Button",Position={200,76},Size={180,36},Legend="■ Termina Riunione",Color=C.Red}
+
+    sep(122)
+    lbl("Punto corrente / Current Item",10,130,300,14,10,C.TV)
+    layout["mtg_current_item_text"]={Style="Text",Position={10,148},Size={878,80},IsReadOnly=true,FontSize=20}
+    layout["mtg_current_item_num"] ={Style="Text",Position={10,236},Size={878,22},IsReadOnly=true,FontSize=13}
+    layout["mtg_prev_item"]={Style="Button",Position={10,266},Size={160,36},Legend="◀ Precedente"}
+    layout["mtg_next_item"]={Style="Button",Position={180,266},Size={160,36},Legend="Successivo ▶"}
+
+    sep(312)
+    lbl("Discussione / Discussion",10,320,250,14,10,C.TV)
+    layout["mtg_start_discussion"] ={Style="Button",Position={10,338},Size={200,36},Legend="▶ Avvia Discussione",Color=C.Grn}
+    layout["mtg_stop_discussion"]  ={Style="Button",Position={220,338},Size={200,36},Legend="■ Ferma Discussione",Color=C.Orn}
+    layout["mtg_discussion_status"]={Style="Text",Position={10,384},Size={878,22},IsReadOnly=true}
+
+  elseif pg == 3 then
+    hdr("Votazione / Voting")
+    shared()
+
+    layout["vote_status_led"] ={Style="Led",Position={10,50},Size={16,16},Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["vote_status_text"]={Style="Text",Position={30,48},Size={260,20},IsReadOnly=true}
+    layout["vote_use_config"] ={Style="Button",Position={10,76},Size={200,24},Legend="Usa Config Punto",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["vote_num_choices"]={Style="Text",Position={730,76},Size={158,24},IsReadOnly=true}
+
+    layout["vote_title_display"]={Style="Text",Position={10,106},Size={878,26},IsReadOnly=true,FontSize=14}
+    lbl("Override titolo manuale:",10,138,140,14,9)
+    layout["vote_manual_title"] ={Style="Text",Position={10,152},Size={878,22}}
+
+    lbl("Scelte / Choices",10,180,150,14,10,C.TV)
+    for i=1,6 do
+      local y=198+(i-1)*22
+      lbl(tostring(i)..":",10,y,16,18,9)
+      layout[string.format("vote_choice_label %d",i)]={Style="Text",Position={28,y},Size={200,18}}
+      layout[string.format("vote_choice_color %d",i)]={Style="Text",Position={232,y},Size={90,18}}
+    end
+
+    layout["vote_result_vis 1"]={Style="Button",Position={340,198},Size={130,22},Legend="Pubblico",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["vote_result_vis 2"]={Style="Button",Position={340,224},Size={130,22},Legend="Individuale",ButtonStyle="Toggle",Color=C.Orn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["vote_realtime"]    ={Style="Button",Position={340,250},Size={130,22},Legend="Realtime ON",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+
+    layout["vote_start"]       ={Style="Button",Position={10,334},Size={180,36},Legend="▶ Avvia Votazione",Color=C.Grn}
+    layout["vote_stop"]        ={Style="Button",Position={200,334},Size={180,36},Legend="■ Chiudi Votazione",Color=C.Red}
+    layout["vote_hide_results"]={Style="Button",Position={390,334},Size={180,36},Legend="Nascondi Risultati"}
+
+    sep(380)
+    lbl("Risultati Live / Live Results",10,387,250,14,10,C.TV)
+    layout["vote_total_votes"]={Style="Text",Position={700,385},Size={188,18},IsReadOnly=true}
+
+    for i=1,6 do
+      local y=408+(i-1)*36
+      layout[string.format("vote_result_label %d",i)]={Style="Text",Position={10,y},Size={200,22},IsReadOnly=true}
+      layout[string.format("vote_result_count %d",i)]={Style="Text",Position={214,y},Size={100,22},IsReadOnly=true}
+      layout[string.format("vote_result_bar %d",i)]  ={Style="Meter",Position={318,y},Size={400,22},Min=0,Max=100}
+      layout[string.format("vote_result_pct %d",i)]  ={Style="Text",Position={722,y},Size={60,22},IsReadOnly=true}
+    end
+
+  elseif pg == 4 then
+    hdr("Risultati / Results")
+    shared()
+
+    layout["res_clear"]        ={Style="Button",Position={752,7},Size={42,24},Legend="Reset",Color=C.Red}
+    lbl("N°",10,44,30,14,9,C.TV)
+    lbl("Titolo Punto",44,44,296,14,9,C.TV)
+    lbl("Votazione",344,44,256,14,9,C.TV)
+    lbl("Risultato",604,44,218,14,9,C.TV)
+    lbl("Tot",826,44,54,14,9,C.TV)
+
+    for i=1,20 do
+      local y=60+(i-1)*27
+      layout[string.format("res_item_title %d",i)]  ={Style="Text",Position={44,y},Size={296,22},IsReadOnly=true}
+      layout[string.format("res_item_vtitle %d",i)] ={Style="Text",Position={344,y},Size={256,22},IsReadOnly=true}
+      layout[string.format("res_item_summary %d",i)]={Style="Text",Position={604,y},Size={218,22},IsReadOnly=true}
+      layout[string.format("res_item_total %d",i)]  ={Style="Text",Position={826,y},Size={54,22},IsReadOnly=true}
+    end
+
+    layout["res_page_prev"]    ={Style="Button",Position={10,612},Size={80,22},Legend="◀ Prec."}
+    layout["res_page_indicator"]={Style="Text",Position={96,612},Size={160,22},IsReadOnly=true}
+    layout["res_page_next"]    ={Style="Button",Position={262,612},Size={80,22},Legend="Succ. ▶"}
+
+  elseif pg == 5 then
+    hdr("Info")
+    shared()
+    layout["info_display"]={Style="Text",Position={50,50},Size={800,560},IsReadOnly=true,FontSize=13}
+  end
+
+  return layout, graphics
+end
+
+-- =============================================================================
+-- RUNTIME
+-- =============================================================================
+if Controls then
+  local rj = require("json")
+
+  PollTimer = Timer.New()
+
+  local State = {
+    current="NotConnected", meetingId=nil, currentItemIdx=1,
+    votingActive=false, discussionActive=false, httpErrCount=0,
+  }
+  local AgendaData  = { title="", date="", items={} }
+  local AgendaStore = {}
+  local ResultsData = {}
+  local currentAgendaPage   = 1
+  local selectedLogicalItem = 0
+  local activeVoteChoiceCount = 3
+  local resultResPage       = 1
+  local REQ_TIMEOUT = 10
+
+  local PRESETS = {
+    {{label="Si/Yes",color="#00AA00"},{label="No",color="#CC0000"},{label="Astenuto/Abstain",color="#FF8800"}},
+    {{label="Si/Yes",color="#00AA00"},{label="No",color="#CC0000"},{label="Astenuto/Abstain",color="#FF8800"},{label="Non votante",color="#888888"}},
+    {{label="Si/Yes",color="#00AA00"},{label="No",color="#CC0000"},{label="Astenuto/Abstain",color="#FF8800"},{label="Non votante",color="#888888"},{label="Opzione E",color="#0055AA"}},
+    {{label="Si/Yes",color="#00AA00"},{label="No",color="#CC0000"},{label="Astenuto/Abstain",color="#FF8800"},{label="Non votante",color="#888888"},{label="Opzione E",color="#0055AA"},{label="Opzione F",color="#AA0055"}},
+  }
+
+  -- ── Helpers ─────────────────────────────────────────────────────────────────
+  local function Log(msg)
+    local prev = Controls["debug_log"].String or ""
+    local lines = {}
+    for l in (prev.."\n"):gmatch("(.-)\n") do
+      if #lines < 80 then table.insert(lines, l) end
+    end
+    table.insert(lines, 1, os.date("%H:%M:%S").." "..tostring(msg))
+    if #lines > 80 then table.remove(lines, #lines) end
+    Controls["debug_log"].String = table.concat(lines, "\n")
+  end
+
+  local function GetPort()
+    return Properties["Use HTTPS"].Value and 9443 or 9080
+  end
+  local function GetScheme()
+    return Properties["Use HTTPS"].Value and "https" or "http"
+  end
+  local function BuildUrl(path)
+    return HttpClient.CreateUrl({
+      Host=string.format("%s://%s", GetScheme(), Properties["Server IP"].Value),
+      Port=GetPort(), Path=path,
+    })
+  end
+  local function AuthHdrGet()
+    return {["Authorization"]="Bearer "..Properties["Bearer Token"].Value,
+            ["Accept"]="application/json",["Content-Type"]="text/html"}
+  end
+  local function AuthHdrPost()
+    return {["Authorization"]="Bearer "..Properties["Bearer Token"].Value,
+            ["Accept"]="application/json",["Content-Type"]="application/json"}
+  end
+  local function HttpGet(path, handler)
+    HttpClient.Download({Url=BuildUrl(path),Method="GET",Headers=AuthHdrGet(),Timeout=REQ_TIMEOUT,VerifyPeer=false,EventHandler=handler})
+  end
+  local function HttpPost(path, data, handler)
+    HttpClient.Upload({Url=BuildUrl(path),Method="POST",Data=rj.encode(data),Headers=AuthHdrPost(),Timeout=REQ_TIMEOUT,VerifyPeer=false,EventHandler=handler})
+  end
+  local function HttpDelete(path, handler)
+    HttpClient.Upload({Url=BuildUrl(path),Method="DELETE",Data="",Headers=AuthHdrGet(),Timeout=REQ_TIMEOUT,VerifyPeer=false,EventHandler=handler})
+  end
+
+  -- ── State machine ────────────────────────────────────────────────────────────
+  local function TransitionTo(s)
+    State.current = s
+    Log("State -> "..s)
+    local notConn = (s=="NotConnected")
+    local ready   = (s=="MeetingReady")
+    local active  = (s=="MeetingActive")
+    local voting  = (s=="VotingActive")
+
+    Controls["conn_status_led"].Boolean  = not notConn
+    Controls["conn_status_text"].String  = notConn and "Non connesso" or "Connesso"
+    Controls["mtg_status_led"].Boolean   = active or voting
+    Controls["mtg_status_text"].String   = notConn and "Non connesso" or (ready and "Pronto" or (voting and "Votazione attiva" or "Riunione attiva"))
+    Controls["vote_status_led"].Boolean  = voting
+    Controls["vote_status_text"].String  = voting and "In corso" or (active and "Nessuna votazione" or "Non attiva")
+
+    Controls["mtg_start"].IsDisabled            = not ready
+    Controls["mtg_end"].IsDisabled              = not (active or voting)
+    Controls["mtg_prev_item"].IsDisabled        = not (active or voting)
+    Controls["mtg_next_item"].IsDisabled        = not (active or voting)
+    Controls["mtg_start_discussion"].IsDisabled = not active
+    Controls["mtg_stop_discussion"].IsDisabled  = not (active and State.discussionActive)
+    Controls["vote_start"].IsDisabled           = not active
+    Controls["vote_stop"].IsDisabled            = not voting
+    Controls["vote_hide_results"].IsDisabled    = not voting
+
+    if voting then PollTimer:Start(2)
+    elseif active or ready then PollTimer:Start(5)
+    else PollTimer:Stop() end
+  end
+
+  local function HandleHttpError(code, err, ctx)
+    State.httpErrCount = State.httpErrCount + 1
+    Log(string.format("HTTP error [%s] %s %s (streak=%d)", ctx or "", tostring(code), tostring(err), State.httpErrCount))
+    if State.httpErrCount >= 3 then
+      TransitionTo("NotConnected")
+      State.httpErrCount = 0
+    end
+  end
+
+  -- ── Persistence ──────────────────────────────────────────────────────────────
+  local function SaveToFile()
+    local path = Properties["Data File Path"].Value
+    local ok, err = pcall(function()
+      local f = io.open(path,"w")
+      if not f then error("cannot open "..path) end
+      f:write(rj.encode({store=AgendaStore, current=AgendaData}))
+      f:close()
+    end)
+    if ok then Log("Salvato: "..path) else Log("Errore salvataggio: "..tostring(err)) end
+  end
+
+  local function LoadFromFile()
+    local path = Properties["Data File Path"].Value
+    pcall(function()
+      local f = io.open(path,"r")
+      if not f then return end
+      local raw = f:read("*all"); f:close()
+      local ok, data = pcall(rj.decode, raw)
+      if ok and data then
+        if data.store   then AgendaStore=data.store end
+        if data.current then AgendaData =data.current end
+      end
+    end)
+  end
+
+  -- ── UI Refresh ───────────────────────────────────────────────────────────────
+  local function RefreshAgendaPage()
+    local items  = AgendaData.items or {}
+    local total  = #items
+    local pages  = math.max(1, math.ceil(total/5))
+    currentAgendaPage = math.max(1, math.min(currentAgendaPage, pages))
+    Controls["odg_page_indicator"].String = string.format("Pag. %d / %d", currentAgendaPage, pages)
+    Controls["odg_meeting_title"].String  = AgendaData.title or ""
+    Controls["odg_meeting_date"].String   = AgendaData.date  or ""
+    local offset = (currentAgendaPage-1)*5
+    for slot=1,5 do
+      local idx  = offset+slot
+      local itm  = items[idx]
+      Controls[string.format("odg_item_title %d",   slot)].String  = itm and string.format("%d. %s", idx, itm.title) or ""
+      Controls[string.format("odg_item_has_vote %d",slot)].Boolean = itm and itm.hasVote or false
+      Controls[string.format("odg_item_select %d",  slot)].Boolean = (selectedLogicalItem == idx) and (itm ~= nil)
+      Controls[string.format("odg_item_select %d",  slot)].IsDisabled = (itm == nil)
+    end
+    local dates = {}
+    for d,_ in pairs(AgendaStore) do table.insert(dates,d) end
+    table.sort(dates)
+    for i=1,4 do
+      Controls[string.format("odg_date_label %d",i)].String  = dates[i] or "—"
+      Controls[string.format("odg_date_select %d",i)].IsDisabled = (dates[i]==nil)
+    end
+  end
+
+  local function RefreshDetailPanel()
+    local item = AgendaData.items and AgendaData.items[selectedLogicalItem]
+    if not item then
+      Controls["odg_selected_label"].String    = "Nessun punto selezionato"
+      Controls["odg_detail_title"].String      = ""
+      Controls["odg_detail_vote_title"].String = ""
+      for m=1,6 do
+        Controls[string.format("odg_detail_choice_label %d",m)].String=""
+        Controls[string.format("odg_detail_choice_color %d",m)].String=""
+      end
+      return
+    end
+    Controls["odg_selected_label"].String    = string.format("Punto %d: %s", selectedLogicalItem, item.title)
+    Controls["odg_detail_title"].String      = item.title or ""
+    Controls["odg_detail_vote_title"].String = (item.voting and item.voting.title) or ""
+    local n = (item.voting and item.voting.numChoices) or 3
+    activeVoteChoiceCount = n
+    for i=1,4 do Controls[string.format("odg_detail_vote_mode %d",i)].Boolean=(i==n-2) end
+    for m=1,6 do
+      local ch = item.voting and item.voting.choices and item.voting.choices[m]
+      Controls[string.format("odg_detail_choice_label %d",m)].String     = ch and ch.label or ""
+      Controls[string.format("odg_detail_choice_color %d",m)].String     = ch and ch.color or ""
+      Controls[string.format("odg_detail_choice_label %d",m)].IsDisabled = (m > n)
+      Controls[string.format("odg_detail_choice_color %d",m)].IsDisabled = (m > n)
+    end
+    local rv = (item.voting and item.voting.resultVisibility) or "Public"
+    Controls["odg_detail_result_vis 1"].Boolean = (rv=="Public")
+    Controls["odg_detail_result_vis 2"].Boolean = (rv=="Individual")
+    Controls["odg_detail_realtime"].Boolean = (item.voting and item.voting.showRealtime) or false
+  end
+
+  local function RefreshVotingPanel()
+    local item = AgendaData.items and AgendaData.items[State.currentItemIdx]
+    if item and Controls["vote_use_config"].Boolean then
+      local vt = (item.voting and item.voting.title ~= "" and item.voting.title) or item.title
+      Controls["vote_title_display"].String = vt or ""
+      local n = (item.voting and item.voting.numChoices) or 3
+      Controls["vote_num_choices"].String = string.format("%d scelte", n)
+      for m=1,6 do
+        local ch = item.voting and item.voting.choices and item.voting.choices[m]
+        Controls[string.format("vote_choice_label %d",m)].String = ch and ch.label or ""
+        Controls[string.format("vote_choice_color %d",m)].String = ch and ch.color or ""
+      end
+      local rv = (item.voting and item.voting.resultVisibility) or "Public"
+      Controls["vote_result_vis 1"].Boolean = (rv=="Public")
+      Controls["vote_result_vis 2"].Boolean = (rv=="Individual")
+      Controls["vote_realtime"].Boolean     = (item.voting and item.voting.showRealtime) or false
+    else
+      local t = Controls["vote_manual_title"].String
+      Controls["vote_title_display"].String = t ~= "" and t or "(nessun titolo)"
+    end
+  end
+
+  local function RefreshVotingResults(data)
+    if not data or not data.choices then return end
+    local total = 0
+    for _,ch in ipairs(data.choices) do total=total+(ch.count or 0) end
+    Controls["vote_total_votes"].String = string.format("Totale: %d voti", total)
+    for m=1,6 do
+      local ch=data.choices[m]
+      local cnt = ch and (ch.count or 0) or 0
+      local pct = (total>0 and ch) and math.floor(cnt/total*100+0.5) or 0
+      Controls[string.format("vote_result_label %d",m)].String = ch and (ch.label or "") or ""
+      Controls[string.format("vote_result_count %d",m)].String = ch and tostring(cnt).." voti" or ""
+      Controls[string.format("vote_result_bar %d",m)].Value    = pct
+      Controls[string.format("vote_result_pct %d",m)].String   = ch and (tostring(pct).."%") or ""
+    end
+  end
+
+  local function RefreshResultsTab()
+    local pages = math.max(1,math.ceil(#ResultsData/20))
+    resultResPage = math.max(1,math.min(resultResPage,pages))
+    Controls["res_page_indicator"].String = string.format("Pag. %d / %d", resultResPage, pages)
+    local off = (resultResPage-1)*20
+    for slot=1,20 do
+      local r=ResultsData[off+slot]
+      Controls[string.format("res_item_title %d",  slot)].String = r and (tostring(off+slot)..". "..(r.title or "")) or ""
+      Controls[string.format("res_item_vtitle %d", slot)].String = r and (r.vtitle or "") or ""
+      Controls[string.format("res_item_summary %d",slot)].String = r and (r.summary or "") or ""
+      Controls[string.format("res_item_total %d",  slot)].String = r and tostring(r.total or 0) or ""
+    end
+  end
+
+  -- ── HTTP response handlers ───────────────────────────────────────────────────
+  local function OnGetMeeting(tbl, code, data, err, hdrs)
+    if code == 200 then
+      State.httpErrCount = 0
+      local ok, mtg = pcall(rj.decode, data)
+      if ok and mtg then
+        if mtg.meetingId then State.meetingId = mtg.meetingId end
+        if mtg.id        then State.meetingId = mtg.id end
+        if State.meetingId and State.current ~= "VotingActive" then
+          if State.current ~= "MeetingActive" then TransitionTo("MeetingActive") end
+        elseif not State.meetingId then
+          if State.current == "NotConnected" then TransitionTo("MeetingReady") end
+        end
+      else
+        if State.current == "NotConnected" then TransitionTo("MeetingReady") end
+      end
+    elseif code == 412 or code == 404 then
+      State.httpErrCount = 0
+      if State.current == "NotConnected" then TransitionTo("MeetingReady")
+      elseif State.current == "MeetingActive" or State.current == "VotingActive" then
+        State.meetingId=nil; TransitionTo("MeetingReady")
+      end
+    else HandleHttpError(code, err, "GetMeeting") end
+  end
+
+  local function OnGetVotingResults(tbl, code, data, err, hdrs)
+    if code == 200 then
+      State.httpErrCount = 0
+      local ok, res = pcall(rj.decode, data)
+      if ok and res then RefreshVotingResults(res) end
+    else HandleHttpError(code, err, "GetVotingResults") end
+  end
+
+  local function OnStartMeeting(tbl, code, data, err, hdrs)
+    if code==200 or code==201 then
+      State.httpErrCount = 0
+      local ok, res = pcall(rj.decode, data)
+      if ok and res then
+        if res.meetingId then State.meetingId=res.meetingId end
+        if res.id        then State.meetingId=res.id end
+      end
+      State.currentItemIdx = 1
+      TransitionTo("MeetingActive")
+      local item = AgendaData.items and AgendaData.items[1]
+      Controls["mtg_current_item_text"].String = item and item.title or AgendaData.title or ""
+      Controls["mtg_current_item_num"].String  = string.format("Punto 1 di %d", #(AgendaData.items or {}))
+      RefreshVotingPanel()
+      Log("Riunione avviata, id="..(tostring(State.meetingId)))
+    else Log("StartMeeting failed: "..tostring(code).." "..tostring(err)) end
+  end
+
+  local function OnEndMeeting(tbl, code, data, err, hdrs)
+    if code==200 or code==204 then
+      State.httpErrCount=0; State.meetingId=nil
+      TransitionTo("MeetingReady")
+      Log("Riunione terminata")
+    else Log("EndMeeting failed: "..tostring(code)) end
+  end
+
+  local function OnStartVoting(tbl, code, data, err, hdrs)
+    if code==200 or code==201 then
+      State.httpErrCount=0; State.votingActive=true
+      TransitionTo("VotingActive")
+      Log("Votazione avviata")
+    else Log("StartVoting failed: "..tostring(code).." "..tostring(err)) end
+  end
+
+  local function ArchiveVoteResults(res)
+    if not res then return end
+    local item=AgendaData.items and AgendaData.items[State.currentItemIdx]
+    local total=0; local parts={}
+    if res.choices then
+      for _,ch in ipairs(res.choices) do
+        total=total+(ch.count or 0)
+        table.insert(parts, string.format("%s:%d", ch.label or "?", ch.count or 0))
+      end
+    end
+    ResultsData[State.currentItemIdx]={
+      title=item and item.title or "",
+      vtitle=item and item.voting and item.voting.title or "",
+      summary=table.concat(parts," "),
+      total=total,
+    }
+    RefreshResultsTab()
+  end
+
+  local function OnStopVoting(tbl, code, data, err, hdrs)
+    if code==200 or code==204 then
+      State.httpErrCount=0
+      HttpGet("api/meeting/voting-results", function(t,c,d,e,h)
+        if c==200 then
+          local ok,res=pcall(rj.decode,d)
+          if ok and res then RefreshVotingResults(res); ArchiveVoteResults(res) end
+        end
+        State.votingActive=false; TransitionTo("MeetingActive")
+        Log("Votazione chiusa e archiviata")
+      end)
+    else Log("StopVoting failed: "..tostring(code)) end
+  end
+
+  -- ── Poll ─────────────────────────────────────────────────────────────────────
+  PollTimer.EventHandler = function()
+    HttpGet("api/meeting", OnGetMeeting)
+    if State.votingActive then
+      HttpGet("api/meeting/voting-results", OnGetVotingResults)
+    end
+  end
+
+  -- ── Business actions ─────────────────────────────────────────────────────────
+  local function StartMeeting()
+    if State.current ~= "MeetingReady" then return end
+    HttpPost("api/meeting", {title=AgendaData.title or "", date=AgendaData.date or ""}, OnStartMeeting)
+  end
+
+  local function EndMeeting()
+    if not (State.current=="MeetingActive" or State.current=="VotingActive") then return end
+    HttpDelete("api/meeting", OnEndMeeting)
+  end
+
+  local function StartVoting()
+    if State.current ~= "MeetingActive" or not State.meetingId then return end
+    local item=AgendaData.items and AgendaData.items[State.currentItemIdx]
+    local useConfig=Controls["vote_use_config"].Boolean
+    local votingTitle,choices,resultVis,showRT
+    if useConfig and item then
+      votingTitle=((item.voting and item.voting.title ~= "") and item.voting.title) or item.title
+      choices={}
+      local n=(item.voting and item.voting.numChoices) or 3
+      for i=1,n do
+        local ch=item.voting and item.voting.choices and item.voting.choices[i]
+        if ch then table.insert(choices,{number=i,label=ch.label,color=ch.color}) end
+      end
+      resultVis=(item.voting and item.voting.resultVisibility) or "Public"
+      showRT=(item.voting and item.voting.showRealtime) or true
+    else
+      votingTitle=Controls["vote_manual_title"].String
+      choices={}
+      for m=1,6 do
+        local l=Controls[string.format("vote_choice_label %d",m)].String
+        local c=Controls[string.format("vote_choice_color %d",m)].String
+        if l~="" then table.insert(choices,{number=#choices+1,label=l,color=c}) end
+      end
+      resultVis=Controls["vote_result_vis 1"].Boolean and "Public" or "Individual"
+      showRT=Controls["vote_realtime"].Boolean
+    end
+    HttpPost("api/meeting/actions",{
+      kind="StartVotingAction", meetingId=State.meetingId,
+      voting={votingTitle=votingTitle,choices=choices,resultVisibility=resultVis,showResultsRealtime=showRT}
+    }, OnStartVoting)
+  end
+
+  local function StopVoting()
+    if State.current ~= "VotingActive" then return end
+    HttpPost("api/meeting/actions",{kind="StopVotingAction",meetingId=State.meetingId}, OnStopVoting)
+  end
+
+  local function StartDiscussion()
+    if State.current ~= "MeetingActive" or not State.meetingId then return end
+    local item=AgendaData.items and AgendaData.items[State.currentItemIdx]
+    HttpPost("api/meeting/actions",{
+      kind="StartDiscussionAction", meetingId=State.meetingId,
+      discussion={title=item and item.title or "", description=""}
+    }, function(t,c,d,e,h)
+      if c==200 or c==201 then
+        State.discussionActive=true
+        Controls["mtg_discussion_status"].String="Discussione: "..(item and item.title or "")
+        Controls["mtg_start_discussion"].IsDisabled=true
+        Controls["mtg_stop_discussion"].IsDisabled=false
+        Log("Discussione avviata")
+      else Log("StartDiscussion failed: "..tostring(c)) end
+    end)
+  end
+
+  local function StopDiscussion()
+    if not State.discussionActive or not State.meetingId then return end
+    HttpPost("api/meeting/actions",{kind="StopDiscussionAction",meetingId=State.meetingId}, function(t,c,d,e,h)
+      if c==200 or c==204 then
+        State.discussionActive=false
+        Controls["mtg_discussion_status"].String="Discussione terminata"
+        Controls["mtg_start_discussion"].IsDisabled=false
+        Controls["mtg_stop_discussion"].IsDisabled=true
+        Log("Discussione terminata")
+      else Log("StopDiscussion failed: "..tostring(c)) end
+    end)
+  end
+
+  -- ── Event handlers ────────────────────────────────────────────────────────────
+  Controls["mtg_start"].EventHandler            = StartMeeting
+  Controls["mtg_end"].EventHandler              = EndMeeting
+  Controls["vote_start"].EventHandler           = StartVoting
+  Controls["vote_stop"].EventHandler            = StopVoting
+  Controls["mtg_start_discussion"].EventHandler = StartDiscussion
+  Controls["mtg_stop_discussion"].EventHandler  = StopDiscussion
+  Controls["vote_use_config"].EventHandler      = RefreshVotingPanel
+  Controls["vote_manual_title"].EventHandler    = RefreshVotingPanel
+
+  Controls["vote_hide_results"].EventHandler = function()
+    for m=1,6 do
+      Controls[string.format("vote_result_count %d",m)].String=""
+      Controls[string.format("vote_result_bar %d",m)].Value=0
+      Controls[string.format("vote_result_pct %d",m)].String=""
+    end
+    Controls["vote_total_votes"].String=""
+  end
+
+  Controls["mtg_prev_item"].EventHandler = function()
+    if State.currentItemIdx>1 then State.currentItemIdx=State.currentItemIdx-1 end
+    local item=AgendaData.items and AgendaData.items[State.currentItemIdx]
+    Controls["mtg_current_item_text"].String=item and item.title or ""
+    Controls["mtg_current_item_num"].String=string.format("Punto %d di %d",State.currentItemIdx,#(AgendaData.items or {}))
+    RefreshVotingPanel()
+  end
+
+  Controls["mtg_next_item"].EventHandler = function()
+    local n=#(AgendaData.items or {})
+    if State.currentItemIdx<n then State.currentItemIdx=State.currentItemIdx+1 end
+    local item=AgendaData.items and AgendaData.items[State.currentItemIdx]
+    Controls["mtg_current_item_text"].String=item and item.title or ""
+    Controls["mtg_current_item_num"].String=string.format("Punto %d di %d",State.currentItemIdx,n)
+    RefreshVotingPanel()
+  end
+
+  -- Agenda paging
+  Controls["odg_page_prev"].EventHandler = function()
+    if currentAgendaPage>1 then currentAgendaPage=currentAgendaPage-1; RefreshAgendaPage() end
+  end
+  Controls["odg_page_next"].EventHandler = function()
+    local pages=math.max(1,math.ceil(#(AgendaData.items or {})/5))
+    if currentAgendaPage<pages then currentAgendaPage=currentAgendaPage+1; RefreshAgendaPage() end
+  end
+
+  Controls["odg_add_item"].EventHandler = function()
+    if not AgendaData.items then AgendaData.items={} end
+    table.insert(AgendaData.items,{
+      title="Nuovo punto",description="",hasVote=false,
+      voting={title="",numChoices=3,choices=PRESETS[1],resultVisibility="Public",showRealtime=true}
+    })
+    currentAgendaPage=math.ceil(#AgendaData.items/5)
+    RefreshAgendaPage()
+  end
+
+  Controls["odg_remove_item"].EventHandler = function()
+    if selectedLogicalItem>0 and AgendaData.items and AgendaData.items[selectedLogicalItem] then
+      table.remove(AgendaData.items,selectedLogicalItem)
+      if selectedLogicalItem>#AgendaData.items then selectedLogicalItem=#AgendaData.items end
+      if selectedLogicalItem<1 then selectedLogicalItem=0 end
+      RefreshAgendaPage(); RefreshDetailPanel()
+    end
+  end
+
+  Controls["odg_move_up"].EventHandler = function()
+    if selectedLogicalItem>1 then
+      local i=selectedLogicalItem
+      AgendaData.items[i],AgendaData.items[i-1]=AgendaData.items[i-1],AgendaData.items[i]
+      selectedLogicalItem=i-1; RefreshAgendaPage(); RefreshDetailPanel()
+    end
+  end
+
+  Controls["odg_move_down"].EventHandler = function()
+    if selectedLogicalItem>0 and selectedLogicalItem<#AgendaData.items then
+      local i=selectedLogicalItem
+      AgendaData.items[i],AgendaData.items[i+1]=AgendaData.items[i+1],AgendaData.items[i]
+      selectedLogicalItem=i+1; RefreshAgendaPage(); RefreshDetailPanel()
+    end
+  end
+
+  for slot=1,5 do
+    local s=slot
+    Controls[string.format("odg_item_select %d",s)].EventHandler = function(ctl)
+      local idx=(currentAgendaPage-1)*5+s
+      if ctl.Boolean then
+        selectedLogicalItem=idx
+        for os=1,5 do if os~=s then Controls[string.format("odg_item_select %d",os)].Boolean=false end end
+        RefreshDetailPanel()
+      else
+        selectedLogicalItem=0; RefreshDetailPanel()
+      end
+    end
+    Controls[string.format("odg_item_has_vote %d",s)].EventHandler = function(ctl)
+      local idx=(currentAgendaPage-1)*5+s
+      if AgendaData.items and AgendaData.items[idx] then AgendaData.items[idx].hasVote=ctl.Boolean end
+    end
+  end
+
+  Controls["odg_detail_title"].EventHandler = function(ctl)
+    if selectedLogicalItem>0 and AgendaData.items and AgendaData.items[selectedLogicalItem] then
+      AgendaData.items[selectedLogicalItem].title=ctl.String; RefreshAgendaPage()
+    end
+  end
+  Controls["odg_detail_vote_title"].EventHandler = function(ctl)
+    if selectedLogicalItem>0 and AgendaData.items and AgendaData.items[selectedLogicalItem] then
+      AgendaData.items[selectedLogicalItem].voting.title=ctl.String
+    end
+  end
+
+  for i=1,4 do
+    local n=i
+    Controls[string.format("odg_detail_vote_mode %d",n)].EventHandler = function(ctl)
+      if ctl.Boolean and selectedLogicalItem>0 and AgendaData.items and AgendaData.items[selectedLogicalItem] then
+        activeVoteChoiceCount=n+2
+        AgendaData.items[selectedLogicalItem].voting.numChoices=activeVoteChoiceCount
+        for oi=1,4 do if oi~=n then Controls[string.format("odg_detail_vote_mode %d",oi)].Boolean=false end end
+        RefreshDetailPanel()
+      end
+    end
+  end
+
+  Controls["odg_detail_preset"].EventHandler = function()
+    if selectedLogicalItem==0 or not AgendaData.items or not AgendaData.items[selectedLogicalItem] then return end
+    local pi=math.max(1,math.min(4,activeVoteChoiceCount-2))
+    local preset=PRESETS[pi]
+    local v=AgendaData.items[selectedLogicalItem].voting
+    v.choices={}
+    for _,ch in ipairs(preset) do table.insert(v.choices,{label=ch.label,color=ch.color}) end
+    v.numChoices=#preset; activeVoteChoiceCount=#preset
+    RefreshDetailPanel()
+  end
+
+  for m=1,6 do
+    local mm=m
+    Controls[string.format("odg_detail_choice_label %d",mm)].EventHandler = function(ctl)
+      if selectedLogicalItem>0 and AgendaData.items and AgendaData.items[selectedLogicalItem] then
+        local v=AgendaData.items[selectedLogicalItem].voting
+        if not v.choices[mm] then v.choices[mm]={label="",color="#888888"} end
+        v.choices[mm].label=ctl.String
+      end
+    end
+    Controls[string.format("odg_detail_choice_color %d",mm)].EventHandler = function(ctl)
+      if selectedLogicalItem>0 and AgendaData.items and AgendaData.items[selectedLogicalItem] then
+        local v=AgendaData.items[selectedLogicalItem].voting
+        if not v.choices[mm] then v.choices[mm]={label="",color="#888888"} end
+        v.choices[mm].color=ctl.String
+      end
+    end
+  end
+
+  for rv=1,2 do
+    local r=rv
+    Controls[string.format("odg_detail_result_vis %d",r)].EventHandler = function(ctl)
+      if ctl.Boolean and selectedLogicalItem>0 and AgendaData.items and AgendaData.items[selectedLogicalItem] then
+        AgendaData.items[selectedLogicalItem].voting.resultVisibility=(r==1) and "Public" or "Individual"
+        Controls[string.format("odg_detail_result_vis %d",3-r)].Boolean=false
+      end
+    end
+  end
+
+  Controls["odg_detail_realtime"].EventHandler = function(ctl)
+    if selectedLogicalItem>0 and AgendaData.items and AgendaData.items[selectedLogicalItem] then
+      AgendaData.items[selectedLogicalItem].voting.showRealtime=ctl.Boolean
+    end
+  end
+
+  Controls["odg_meeting_title"].EventHandler = function(ctl) AgendaData.title=ctl.String end
+  Controls["odg_meeting_date"].EventHandler  = function(ctl) AgendaData.date=ctl.String end
+
+  Controls["odg_save_agenda"].EventHandler = function()
+    if AgendaData.date and AgendaData.date~="" then
+      AgendaStore[AgendaData.date]={title=AgendaData.title,date=AgendaData.date,items=AgendaData.items}
+    end
+    SaveToFile(); RefreshAgendaPage()
+  end
+
+  Controls["odg_load_agenda"].EventHandler = function()
+    local d=AgendaData.date
+    if d and d~="" and AgendaStore[d] then
+      AgendaData={title=AgendaStore[d].title or "",date=d,items=AgendaStore[d].items or {}}
+      currentAgendaPage=1; selectedLogicalItem=0
+      RefreshAgendaPage(); RefreshDetailPanel()
+      Log("OdG caricato: "..d)
+    else Log("Nessun OdG per: "..tostring(d)) end
+  end
+
+  Controls["odg_new_agenda"].EventHandler = function()
+    AgendaData={title="Nuova Riunione",date=os.date("%Y-%m-%d"),items={}}
+    currentAgendaPage=1; selectedLogicalItem=0
+    RefreshAgendaPage(); RefreshDetailPanel()
+  end
+
+  for i=1,4 do
+    local ii=i
+    Controls[string.format("odg_date_select %d",ii)].EventHandler = function()
+      local d=Controls[string.format("odg_date_label %d",ii)].String
+      if d and d~="—" and AgendaStore[d] then
+        AgendaData={title=AgendaStore[d].title or "",date=d,items=AgendaStore[d].items or {}}
+        currentAgendaPage=1; selectedLogicalItem=0
+        RefreshAgendaPage(); RefreshDetailPanel()
+        Log("OdG caricato: "..d)
+      end
+    end
+  end
+
+  Controls["odg_do_export"].EventHandler = function()
+    local ok,s=pcall(rj.encode,AgendaData)
+    Controls["odg_json_export"].String = ok and s or ("ERRORE: "..tostring(s))
+    if ok then Log("Export JSON generato") else Log("Export error: "..tostring(s)) end
+  end
+
+  Controls["odg_do_import"].EventHandler = function()
+    local s=Controls["odg_json_import"].String
+    if s=="" then return end
+    local ok,data=pcall(rj.decode,s)
+    if ok and data and data.items then
+      AgendaData=data; currentAgendaPage=1; selectedLogicalItem=0
+      RefreshAgendaPage(); RefreshDetailPanel()
+      Log("Importato: "..#AgendaData.items.." punti")
+    else Log("Import error: JSON non valido") end
+  end
+
+  Controls["res_clear"].EventHandler = function()
+    ResultsData={}; RefreshResultsTab(); Log("Risultati cancellati")
+  end
+  Controls["res_page_prev"].EventHandler = function()
+    if resultResPage>1 then resultResPage=resultResPage-1; RefreshResultsTab() end
+  end
+  Controls["res_page_next"].EventHandler = function()
+    local pages=math.max(1,math.ceil(#ResultsData/20))
+    if resultResPage<pages then resultResPage=resultResPage+1; RefreshResultsTab() end
+  end
+
+  -- ── Init ─────────────────────────────────────────────────────────────────────
+  LoadFromFile()
+  TransitionTo("NotConnected")
+
+  Controls["info_display"].String = string.format(
+    "Plugin: Confero Agenda Manager\nVersione: %s\nAutore: Matteo Fioretto\nPer: Prase, a Midwich company\nSistemi: Plixus, G4\nAPI: Confero REST v7.17\n\n© 2026 Tutti i diritti riservati",
+    PluginInfo.Version)
+
+  RefreshAgendaPage()
+  RefreshDetailPanel()
+  RefreshResultsTab()
+  RefreshVotingPanel()
+
+  HttpGet("api/meeting", OnGetMeeting)
+  PollTimer:Start(5)
+end
