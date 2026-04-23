@@ -1,6 +1,6 @@
 PluginInfo = {
   Name        = "Confero~Agenda Manager",
-  Version     = "2.0.0",
+  Version     = "2.0.1",
   Id          = "Confero.AgendaManager.v2",
   Description = "Gestione ordine del giorno, votazioni, sedili e audio – Televic Confero (Plixus/G4)",
   Author      = "Matteo Fioretto – Prase, a Midwich company"
@@ -21,7 +21,7 @@ function GetProperties()
     { Name="Server IP",      Type="string",  Value="192.168.1.1" },
     { Name="Use HTTPS",      Type="boolean", Value=true },
     { Name="Bearer Token",   Type="string",  Value="" },
-    { Name="Data File Path", Type="string",  Value="agendas.json" },
+    { Name="Data File Path", Type="string",  Value="/media/agendas.json" },
     { Name="Seats",          Type="integer", Min=1, Max=300, Value=25 },
   }
 end
@@ -723,8 +723,7 @@ if Controls then
       ReportStatus("OK")
       local ok, mtg = pcall(rj.decode, data)
       if ok and mtg then
-        if mtg.meetingId then State.meetingId = mtg.meetingId end
-        if mtg.id        then State.meetingId = mtg.id end
+        State.meetingId = mtg.id or mtg.meetingId or mtg.meeting_id or "active"
         if State.meetingId and State.current ~= "VotingActive" then
           if State.current ~= "MeetingActive" then TransitionTo("MeetingActive") end
         elseif not State.meetingId then
@@ -1062,8 +1061,7 @@ if Controls then
         local val = ChangeDefaultVolume(tabdata["gain"])
         DefaultchannelselectorvolumeValue = val
         Controls["Defaultchannelselectorvolume"].String = val
-        DefaultchannelselectorvolumeTextList = {val}
-        Controls["DefaultchannelselectorvolumeText"].Choices = DefaultchannelselectorvolumeTextList
+        Controls["DefaultchannelselectorvolumeText"].String = tostring(val)
       elseif code==401 then ReportStatus("MISSING","Check Bearer Token")
       elseif err then ReportStatus("FAULT",err) end
     end)
@@ -1077,8 +1075,7 @@ if Controls then
         local val = ChangeSpeakerVolume(tonumber(tabdata["gain"]))
         LoudSpeakervolumeValue = val
         Controls["LoudSpeakervolume"].String = val
-        LoudSpeakervolumeTextList = {val}
-        Controls["LoudSpeakervolumeText"].Choices = LoudSpeakervolumeTextList
+        Controls["LoudSpeakervolumeText"].String = tostring(val)
       elseif code==401 then ReportStatus("MISSING","Check Bearer Token")
       elseif err then ReportStatus("FAULT",err) end
     end)
@@ -1187,8 +1184,7 @@ if Controls then
         local val = ChangeSpeakerVolume(tonumber(tabdata["gain"]))
         if LoudSpeakervolumeValue ~= val then
           Controls["LoudSpeakervolume"].String = val
-          LoudSpeakervolumeTextList = {val}
-          Controls["LoudSpeakervolumeText"].Choices = LoudSpeakervolumeTextList
+          Controls["LoudSpeakervolumeText"].String = tostring(val)
           LoudSpeakervolumeValue = val
         end
       end
@@ -1199,8 +1195,7 @@ if Controls then
         local val = ChangeDefaultVolume(tabdata["gain"])
         if DefaultchannelselectorvolumeValue ~= val then
           Controls["Defaultchannelselectorvolume"].String = val
-          DefaultchannelselectorvolumeTextList = {val}
-          Controls["DefaultchannelselectorvolumeText"].Choices = DefaultchannelselectorvolumeTextList
+          Controls["DefaultchannelselectorvolumeText"].String = tostring(val)
           DefaultchannelselectorvolumeValue = val
         end
       end
@@ -1242,9 +1237,15 @@ if Controls then
   end
 
   -- ── Business actions ──────────────────────────────────────────────────────────
+  local function ConvertDateForAPI(d)
+    local day, mon, yr = d:match("(%d+)/(%d+)/(%d+)")
+    if day then return string.format("%s-%s-%s", yr, mon, day) end
+    return d
+  end
+
   local function StartMeeting()
     if State.current ~= "MeetingReady" then return end
-    HttpPost("api/meeting", {title=AgendaData.title or "", date=AgendaData.date or ""}, OnStartMeeting)
+    HttpPost("api/meeting", {title=AgendaData.title or "", date=ConvertDateForAPI(AgendaData.date or "")}, OnStartMeeting)
   end
 
   local function EndMeeting()
@@ -1278,22 +1279,27 @@ if Controls then
       resultVis=Controls[string.format("vote_result_vis_%d",1)].Boolean and "Public" or "Individual"
       showRT=Controls["vote_realtime"].Boolean
     end
+    if #choices == 0 then
+      table.insert(choices, {number=1, label="Sì",       color="Green"})
+      table.insert(choices, {number=2, label="No",       color="Red"})
+      table.insert(choices, {number=3, label="Astenuto", color="Yellow"})
+    end
     HttpPost("api/meeting/actions",{
-      kind="StartVotingAction", meetingId=State.meetingId,
+      kind="StartVotingAction",
       voting={votingTitle=votingTitle,choices=choices,resultVisibility=resultVis,showResultsRealtime=showRT}
     }, OnStartVoting)
   end
 
   local function StopVoting()
     if State.current ~= "VotingActive" then return end
-    HttpPost("api/meeting/actions",{kind="StopVotingAction",meetingId=State.meetingId}, OnStopVoting)
+    HttpPost("api/meeting/actions",{kind="StopVotingAction"}, OnStopVoting)
   end
 
   local function StartDiscussion()
     if State.current ~= "MeetingActive" or not State.meetingId then return end
     local item=AgendaData.items and AgendaData.items[State.currentItemIdx]
     HttpPost("api/meeting/actions",{
-      kind="StartDiscussionAction", meetingId=State.meetingId,
+      kind="StartDiscussionAction",
       discussion={title=item and item.title or "", description=""}
     }, function(t,c,d,e,h)
       if c==200 or c==201 then
@@ -1308,7 +1314,7 @@ if Controls then
 
   local function StopDiscussion()
     if not State.discussionActive or not State.meetingId then return end
-    HttpPost("api/meeting/actions",{kind="StopDiscussionAction",meetingId=State.meetingId}, function(t,c,d,e,h)
+    HttpPost("api/meeting/actions",{kind="StopDiscussionAction"}, function(t,c,d,e,h)
       if c==200 or c==204 then
         State.discussionActive=false
         Controls["mtg_discussion_status"].String="Discussione terminata"
@@ -1582,15 +1588,13 @@ if Controls then
 
   -- Volume handlers
   Controls["Defaultchannelselectorvolume"].EventHandler = function(ctl)
-    DefaultchannelselectorvolumeTextList = {ctl.Value}
-    Controls["DefaultchannelselectorvolumeText"].Choices = DefaultchannelselectorvolumeTextList
+    Controls["DefaultchannelselectorvolumeText"].String = tostring(ctl.Value)
     RequestSetDefaultVolume()
     ApplyVolume()
   end
 
   Controls["LoudSpeakervolume"].EventHandler = function(ctl)
-    LoudSpeakervolumeTextList = {ctl.Value}
-    Controls["LoudSpeakervolumeText"].Choices = LoudSpeakervolumeTextList
+    Controls["LoudSpeakervolumeText"].String = tostring(ctl.Value)
     RequestSetSpeakerVolume()
   end
 
