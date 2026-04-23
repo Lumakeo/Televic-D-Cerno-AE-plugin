@@ -14,7 +14,7 @@ git add -A && git commit -m "<description>" && git push origin main
 
 ## Progetto: Confero Agenda Manager
 
-### Stato attuale (2026-04-23) — v2.0.4 (commit `bdfd6aa`)
+### Stato attuale (2026-04-23) — v2.0.6 (commit `6d71c79`)
 
 Plugin Q-SYS in Lua per gestione ordine del giorno, votazioni, sedili e audio su **Televic Confero (Plixus/G4)**.
 
@@ -97,6 +97,8 @@ State = { current, meetingId, votingId, discussionId, currentItemIdx,
 | v2.0.2 | `6145d10` | `POST api/meeting` richiede `participants:[]`; risposta è UUID grezzo; `StartVotingAction` richiede `choiceId`, `choiceTitle`, `hexColor`, `button`; `StopVoting` richiede `votingId`; `StopDiscussion` richiede `discussionId`; risultati voto usano campo `global` con `choiceTitle` |
 | v2.0.3 | `b9db6fe` | `StartMeeting` auto-popola `participants` da `GET api/room/seats/discussion`; fallback a `participants:[]` se 500 — **rollback in v2.0.4** |
 | v2.0.4 | `bdfd6aa` | Revert `StartMeeting` a `participants:[]` diretto — server restituisce 400 (non 500) per qualsiasi struttura participant; il fallback v2.0.3 non scattava |
+| v2.0.5 | `25c8cb0` | `OnGetVotingResults`: 412/404 silenzioso (reset `votingActive`, transizione a MeetingActive); ignora 500 transitorio post-avvio; `OnEndMeeting` resetta `votingActive`+`discussionActive` |
+| v2.0.6 | `6d71c79` | `StartMeeting` popola `participants` con `presence:{kind="LocalParticipantPresence",seatNumber=N}` — attiva LED F-DV durante votazione; fallback a `participants:[]` se server rifiuta |
 
 ---
 
@@ -112,11 +114,12 @@ State = { current, meetingId, votingId, discussionId, currentItemIdx,
 
 - Il campo `button` in ogni choice (`++/+/0/-/--`) mappa ai 5 tasti fisici del dispositivo.
 - Con 3 scelte (Sì/No/Astenuto): tasti `+`, `-`, `0` accesi; `++` e `--` restano spenti (corretto).
-- `POST api/meeting` con `participants:[]` è l'unica struttura accettata (200). Qualsiasi participant object → 400 o 500.
-- L'attivazione dei tasti F-DV durante la votazione è gestita dal firmware Plixus, non dal campo `participants`.
-- `PATCH api/room/seats/voting` esiste (formato non documentato/non decifrabile).
+- I LED F-DV si attivano **solo se il sedile è in `participants`** con `presence.kind="LocalParticipantPresence"`.
+- Struttura participant corretta: `{participantId, firstName, lastName, presence:{kind="LocalParticipantPresence", seatNumber=N}}`
+- `POST api/meeting` con struttura sbagliata (senza `kind`) → 400 "Invalid ParticipantPresence".
+- Valori `kind` accettati: `LocalParticipantPresence`, `RemoteParticipantPresence`, `AbsentParticipantPresence`.
+- `PATCH api/room/seats/voting` → 400 "Missing json field: role" (formato ancora non decifrabile).
 
 ### Prossimi passi
-1. Test hardware v2.0.4: `StartMeeting` deve tornare a funzionare (HTTP 200)
-2. Verificare percorso file OdG: impostare `Data File Path` a un percorso scrivibile nel Q-Core
-3. F-DV: verificare se i LED si attivano ora che la riunione parte correttamente
+1. Test hardware v2.0.6: verificare LED F-DV attivi avviando riunione dal plugin
+2. Verificare percorso file OdG scrivibile sul Q-Core hardware (es. `/tmp/agendas.json`)
