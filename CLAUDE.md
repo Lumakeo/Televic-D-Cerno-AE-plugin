@@ -14,7 +14,7 @@ git add -A && git commit -m "<description>" && git push origin main
 
 ## Progetto: Confero Agenda Manager
 
-### Stato attuale (2026-04-21) — v2.0.0 (commit `b0e55e5`)
+### Stato attuale (2026-04-23) — v2.0.1 (commit `efdba05`)
 
 Plugin Q-SYS in Lua per gestione ordine del giorno, votazioni, sedili e audio su **Televic Confero (Plixus/G4)**.
 
@@ -31,7 +31,7 @@ Plugin Q-SYS in Lua per gestione ordine del giorno, votazioni, sedili e audio su
 - Controlli dinamici: `SeatButton_N` e `RequestLED_N` (loop su `props["Seats"].Value`)
 - State machine: `NotConnected → MeetingReady → MeetingActive → VotingActive`
 - Auth: `Bearer Token` — JSON via `require("json")`
-- Persistenza OdG su file (`agendas.json`)
+- Persistenza OdG su file — default `/media/agendas.json` (percorso assoluto Q-SYS)
 - Data formato italiano: `GG/MM/AAAA`
 
 **4 timer (runtime):**
@@ -68,8 +68,18 @@ HttpClient.Download({ Url=BuildUrl(path), Method="GET", Headers=AuthHdrGet(), Ti
 HttpClient.Upload({   Url=BuildUrl(path), Method="PUT"/"POST"/"DELETE", Data=rj.encode(data), Headers=AuthHdrPost(), ... })
 ```
 
+**Fix v2.0.1 (commit `efdba05`, 2026-04-23):**
+- `ConvertDateForAPI()`: converte `DD/MM/YYYY` → `YYYY-MM-DD` per `POST api/meeting` (causa 400)
+- Azioni meeting: rimosso `meetingId` dal payload (server usa Bearer Token); sentinel `"active"` in `OnGetMeeting`; fallback choices default se vuote
+- Volume text: `.Choices={val}` → `.String=tostring(val)` su controlli `Style="Text"` (6 punti)
+- File path: default `/media/agendas.json` (relativo falliva in Q-SYS)
+
+**Note API (da test hardware):**
+- `GET api/meeting` non restituisce `meetingId`/`id` — usare sentinel `"active"` per tracking interno
+- `POST api/meeting/actions`: NON includere `meetingId` nel payload (server contestualizza da Bearer Token)
+- `StartDiscussion 412` → probabile che richieda agendaItemId o dipenda da stato meeting; da investigare
+- `.Choices` funziona solo su `Style="ListBox"`/`"ComboBox"`, ignorato su `Style="Text"`
+
 ### Prossimi passi
-1. Aprire in **Q-SYS Designer** → verifica compilazione design-time (0 errori orange)
-2. Emulazione → verificare 7 tab e griglia sedili (Seats=12 → 12 pulsanti)
-3. Test connessione reale (IP + Bearer Token nelle Properties, ConnectServer ON)
-4. Eventuali fix endpoint/JSON basati sui test
+1. Test hardware v2.0.1: verificare avvio riunione, votazione, volume text, salvataggio OdG
+2. Se `StartDiscussion` ancora 412: investigare se API richiede `agendaItemId` nel payload
