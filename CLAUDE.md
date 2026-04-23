@@ -14,7 +14,7 @@ git add -A && git commit -m "<description>" && git push origin main
 
 ## Progetto: Confero Agenda Manager
 
-### Stato attuale (2026-04-23) — v2.0.3 (commit `b9db6fe`)
+### Stato attuale (2026-04-23) — v2.0.4 (commit `bdfd6aa`)
 
 Plugin Q-SYS in Lua per gestione ordine del giorno, votazioni, sedili e audio su **Televic Confero (Plixus/G4)**.
 
@@ -95,7 +95,8 @@ State = { current, meetingId, votingId, discussionId, currentItemIdx,
 |----------|--------|-----|
 | v2.0.1 | `efdba05` | `ConvertDateForAPI()` DD/MM→ISO; file path `/data/agendas.json`; volume text `.String`; guard OdG vuoto |
 | v2.0.2 | `6145d10` | `POST api/meeting` richiede `participants:[]`; risposta è UUID grezzo; `StartVotingAction` richiede `choiceId`, `choiceTitle`, `hexColor`, `button`; `StopVoting` richiede `votingId`; `StopDiscussion` richiede `discussionId`; risultati voto usano campo `global` con `choiceTitle` |
-| v2.0.3 | `b9db6fe` | `StartMeeting` auto-popola `participants` da `GET api/room/seats/discussion` (sedili online); fallback a `participants:[]` se server risponde 500 |
+| v2.0.3 | `b9db6fe` | `StartMeeting` auto-popola `participants` da `GET api/room/seats/discussion`; fallback a `participants:[]` se 500 — **rollback in v2.0.4** |
+| v2.0.4 | `bdfd6aa` | Revert `StartMeeting` a `participants:[]` diretto — server restituisce 400 (non 500) per qualsiasi struttura participant; il fallback v2.0.3 non scattava |
 
 ---
 
@@ -111,10 +112,11 @@ State = { current, meetingId, votingId, discussionId, currentItemIdx,
 
 - Il campo `button` in ogni choice (`++/+/0/-/--`) mappa ai 5 tasti fisici del dispositivo.
 - Con 3 scelte (Sì/No/Astenuto): tasti `+`, `-`, `0` accesi; `++` e `--` restano spenti (corretto).
-- I tasti si attivano solo se il sedile è presente nella lista `participants` della riunione.
+- `POST api/meeting` con `participants:[]` è l'unica struttura accettata (200). Qualsiasi participant object → 400 o 500.
+- L'attivazione dei tasti F-DV durante la votazione è gestita dal firmware Plixus, non dal campo `participants`.
 - `PATCH api/room/seats/voting` esiste (formato non documentato/non decifrabile).
 
 ### Prossimi passi
-1. Test hardware v2.0.3: verificare che F-DV mostri i LED durante la votazione
-2. Se log mostra "retry senza participants": struttura participants non accettata → problema di configurazione hardware
-3. Verificare percorso file OdG: impostare `Data File Path` a un percorso scrivibile nel Q-Core
+1. Test hardware v2.0.4: `StartMeeting` deve tornare a funzionare (HTTP 200)
+2. Verificare percorso file OdG: impostare `Data File Path` a un percorso scrivibile nel Q-Core
+3. F-DV: verificare se i LED si attivano ora che la riunione parte correttamente
