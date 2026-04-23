@@ -1,6 +1,6 @@
 PluginInfo = {
   Name        = "Confero~Agenda Manager",
-  Version     = "2.0.4",
+  Version     = "2.0.5",
   Id          = "Confero.AgendaManager.v2",
   Description = "Gestione ordine del giorno, votazioni, sedili e audio – Televic Confero (Plixus/G4)",
   Author      = "Matteo Fioretto – Prase, a Midwich company"
@@ -773,7 +773,12 @@ if Controls then
       State.httpErrCount = 0
       local ok, res = pcall(rj.decode, data)
       if ok and res then RefreshVotingResults(res) end
-    else HandleHttpError(code, err, "GetVotingResults") end
+    elseif code == 412 or code == 404 then
+      State.votingActive = false
+      if State.current == "VotingActive" then TransitionTo("MeetingActive") end
+    elseif code ~= 500 then
+      HandleHttpError(code, err, "GetVotingResults")
+    end
   end
 
   local function OnStartMeeting(tbl, code, data, err, hdrs)
@@ -792,7 +797,7 @@ if Controls then
 
   local function OnEndMeeting(tbl, code, data, err, hdrs)
     if code==200 or code==204 then
-      State.httpErrCount=0; State.meetingId=nil
+      State.httpErrCount=0; State.meetingId=nil; State.votingActive=false; State.discussionActive=false
       TransitionTo("MeetingReady")
       Controls["MeetingType"].Boolean = false
       Controls["MeetingTitle"].Choices = {}
