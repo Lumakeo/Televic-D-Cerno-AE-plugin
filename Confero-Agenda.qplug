@@ -1,6 +1,6 @@
 PluginInfo = {
   Name        = "Confero~Agenda Manager",
-  Version     = "2.0.2",
+  Version     = "2.0.3",
   Id          = "Confero.AgendaManager.v2",
   Description = "Gestione ordine del giorno, votazioni, sedili e audio – Televic Confero (Plixus/G4)",
   Author      = "Matteo Fioretto – Prase, a Midwich company"
@@ -1248,7 +1248,38 @@ if Controls then
       Log("Errore: caricare un OdG prima di avviare la riunione")
       return
     end
-    HttpPost("api/meeting", {title=AgendaData.title or "", date=ConvertDateForAPI(AgendaData.date), participants={}}, OnStartMeeting)
+    local title = AgendaData.title or ""
+    local date  = ConvertDateForAPI(AgendaData.date)
+    HttpGet("api/room/seats/discussion", function(t,c,d,e,h)
+      local participants = {}
+      if c == 200 then
+        local ok, seats = pcall(rj.decode, d)
+        if ok and seats then
+          for _, seat in ipairs(seats) do
+            if seat.state == "online" then
+              table.insert(participants, {
+                participantId = tostring(seat.seatNumber),
+                firstName     = "Sedile",
+                lastName      = tostring(seat.seatNumber),
+                seatNumber    = seat.seatNumber,
+              })
+            end
+          end
+        end
+      end
+      HttpPost("api/meeting", {title=title, date=date, participants=participants},
+        function(tt,cc,dd,ee,hh)
+          if cc == 200 or cc == 201 then
+            OnStartMeeting(tt,cc,dd,ee,hh)
+          elseif cc == 500 then
+            -- partecipanti non accettati, riprova senza
+            Log("StartMeeting: retry senza participants")
+            HttpPost("api/meeting", {title=title, date=date, participants={}}, OnStartMeeting)
+          else
+            OnStartMeeting(tt,cc,dd,ee,hh)
+          end
+        end)
+    end)
   end
 
   local function EndMeeting()
