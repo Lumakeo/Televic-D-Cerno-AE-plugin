@@ -119,6 +119,7 @@ State = { current, meetingId, votingId, discussionId, currentItemIdx,
 - `POST api/meeting` con struttura sbagliata (senza `kind`) → 400 "Invalid ParticipantPresence".
 - Valori `kind` accettati: `LocalParticipantPresence`, `RemoteParticipantPresence`, `AbsentParticipantPresence`.
 - `PATCH api/room/seats/voting` → 400 "Missing json field: role" (formato ancora non decifrabile).
+- **LED sempre blu**: la Confidea F-DV usa blu fisso indipendentemente da `color`/`hexColor` nel payload — è il colore hardware del firmware Plixus. `color`/`hexColor` servono solo per display software. Blu lampeggiante/fisso = votazione aperta; blu fisso sul tasto premuto = voto registrato.
 
 ### Prossimi passi
 1. Test hardware v2.0.6: verificare LED F-DV attivi avviando riunione dal plugin
