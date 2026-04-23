@@ -1,6 +1,6 @@
 PluginInfo = {
   Name        = "Confero~Agenda Manager",
-  Version     = "2.0.1",
+  Version     = "2.0.2",
   Id          = "Confero.AgendaManager.v2",
   Description = "Gestione ordine del giorno, votazioni, sedili e audio – Televic Confero (Plixus/G4)",
   Author      = "Matteo Fioretto – Prase, a Midwich company"
@@ -21,7 +21,7 @@ function GetProperties()
     { Name="Server IP",      Type="string",  Value="192.168.1.1" },
     { Name="Use HTTPS",      Type="boolean", Value=true },
     { Name="Bearer Token",   Type="string",  Value="" },
-    { Name="Data File Path", Type="string",  Value="/media/agendas.json" },
+    { Name="Data File Path", Type="string",  Value="/data/agendas.json" },
     { Name="Seats",          Type="integer", Min=1, Max=300, Value=25 },
   }
 end
@@ -448,8 +448,8 @@ if Controls then
   RecordingTimer= Timer.New()
 
   local State = {
-    current="NotConnected", meetingId=nil, currentItemIdx=1,
-    votingActive=false, discussionActive=false, httpErrCount=0,
+    current="NotConnected", meetingId=nil, votingId=nil, discussionId=nil,
+    currentItemIdx=1, votingActive=false, discussionActive=false, httpErrCount=0,
   }
   local AgendaData  = { title="", date="", items={} }
   local AgendaStore = {}
@@ -687,15 +687,16 @@ if Controls then
   end
 
   local function RefreshVotingResults(data)
-    if not data or not data.choices then return end
+    local choices = data and (data.global or data.choices)
+    if not choices then return end
     local total = 0
-    for _,ch in ipairs(data.choices) do total=total+(ch.count or 0) end
+    for _,ch in ipairs(choices) do total=total+(ch.count or 0) end
     Controls["vote_total_votes"].String = string.format("Totale: %d voti", total)
     for m=1,6 do
-      local ch=data.choices[m]
+      local ch=choices[m]
       local cnt = ch and (ch.count or 0) or 0
       local pct = (total>0 and ch) and math.floor(cnt/total*100+0.5) or 0
-      Controls[string.format("vote_result_label_%d",m)].String = ch and (ch.label or "") or ""
+      Controls[string.format("vote_result_label_%d",m)].String = ch and (ch.choiceTitle or ch.label or "") or ""
       Controls[string.format("vote_result_count_%d",m)].String = ch and tostring(cnt).." voti" or ""
       Controls[string.format("vote_result_bar_%d",m)].Value    = pct
       Controls[string.format("vote_result_pct_%d",m)].String   = ch and (tostring(pct).."%") or ""
@@ -778,11 +779,7 @@ if Controls then
   local function OnStartMeeting(tbl, code, data, err, hdrs)
     if code==200 or code==201 then
       State.httpErrCount = 0
-      local ok, res = pcall(rj.decode, data)
-      if ok and res then
-        if res.meetingId then State.meetingId=res.meetingId end
-        if res.id        then State.meetingId=res.id end
-      end
+      State.meetingId = data and data:match("^%s*(.-)%s*$") or nil
       State.currentItemIdx = 1
       TransitionTo("MeetingActive")
       local item = AgendaData.items and AgendaData.items[1]
@@ -807,8 +804,9 @@ if Controls then
   local function OnStartVoting(tbl, code, data, err, hdrs)
     if code==200 or code==201 then
       State.httpErrCount=0; State.votingActive=true
+      State.votingId = data and data:match("^%s*(.-)%s*$") or nil
       TransitionTo("VotingActive")
-      Log("Votazione avviata")
+      Log("Votazione avviata, id="..(tostring(State.votingId)))
     else Log("StartVoting failed: "..tostring(code).." "..tostring(err)) end
   end
 
@@ -816,10 +814,11 @@ if Controls then
     if not res then return end
     local item=AgendaData.items and AgendaData.items[State.currentItemIdx]
     local total=0; local parts={}
-    if res.choices then
-      for _,ch in ipairs(res.choices) do
+    local choices = res.global or res.choices
+    if choices then
+      for _,ch in ipairs(choices) do
         total=total+(ch.count or 0)
-        table.insert(parts, string.format("%s:%d", ch.label or "?", ch.count or 0))
+        table.insert(parts, string.format("%s:%d", ch.choiceTitle or ch.label or "?", ch.count or 0))
       end
     end
     ResultsData[State.currentItemIdx]={
@@ -1245,7 +1244,11 @@ if Controls then
 
   local function StartMeeting()
     if State.current ~= "MeetingReady" then return end
-    HttpPost("api/meeting", {title=AgendaData.title or "", date=ConvertDateForAPI(AgendaData.date or "")}, OnStartMeeting)
+    if not AgendaData.date or AgendaData.date == "" then
+      Log("Errore: caricare un OdG prima di avviare la riunione")
+      return
+    end
+    HttpPost("api/meeting", {title=AgendaData.title or "", date=ConvertDateForAPI(AgendaData.date), participants={}}, OnStartMeeting)
   end
 
   local function EndMeeting()
@@ -1253,57 +1256,83 @@ if Controls then
     HttpDelete("api/meeting", OnEndMeeting)
   end
 
+  local COLOR_HEX = {
+    Green="#00AA00", Red="#CC0000", Yellow="#CCAA00", Blue="#0066CC",
+    White="#FFFFFF", Gray="#888888", Orange="#FF6600", Purple="#9900CC",
+  }
+  local CHOICE_BTN = {"+", "-", "0", "++", "--", "0"}
+
+  local function BuildApiChoices(rawChoices)
+    local out = {}
+    for i, ch in ipairs(rawChoices) do
+      local lbl = ch.label or tostring(i)
+      table.insert(out, {
+        number    = i,
+        choiceId  = tostring(i),
+        label     = lbl,
+        choiceTitle = lbl,
+        color     = ch.color or "Gray",
+        hexColor  = COLOR_HEX[ch.color] or "#888888",
+        button    = CHOICE_BTN[i] or "0",
+      })
+    end
+    return out
+  end
+
   local function StartVoting()
     if State.current ~= "MeetingActive" or not State.meetingId then return end
     local item=AgendaData.items and AgendaData.items[State.currentItemIdx]
     local useConfig=Controls["vote_use_config"].Boolean
-    local votingTitle,choices,resultVis,showRT
+    local votingTitle, rawChoices, resultVis, showRT
     if useConfig and item then
       votingTitle=((item.voting and item.voting.title ~= "") and item.voting.title) or item.title
-      choices={}
+      rawChoices={}
       local n=(item.voting and item.voting.numChoices) or 3
       for i=1,n do
         local ch=item.voting and item.voting.choices and item.voting.choices[i]
-        if ch then table.insert(choices,{number=i,label=ch.label,color=ch.color}) end
+        if ch then table.insert(rawChoices,{label=ch.label,color=ch.color}) end
       end
       resultVis=(item.voting and item.voting.resultVisibility) or "Public"
       showRT=(item.voting and item.voting.showRealtime) or true
     else
       votingTitle=Controls["vote_manual_title"].String
-      choices={}
+      rawChoices={}
       for m=1,6 do
         local l=Controls[string.format("vote_choice_label_%d",m)].String
         local c=Controls[string.format("vote_choice_color_%d",m)].String
-        if l~="" then table.insert(choices,{number=#choices+1,label=l,color=c}) end
+        if l~="" then table.insert(rawChoices,{label=l,color=c}) end
       end
       resultVis=Controls[string.format("vote_result_vis_%d",1)].Boolean and "Public" or "Individual"
       showRT=Controls["vote_realtime"].Boolean
     end
-    if #choices == 0 then
-      table.insert(choices, {number=1, label="Sì",       color="Green"})
-      table.insert(choices, {number=2, label="No",       color="Red"})
-      table.insert(choices, {number=3, label="Astenuto", color="Yellow"})
+    if #rawChoices == 0 then
+      rawChoices = {{label="Sì",color="Green"},{label="No",color="Red"},{label="Astenuto",color="Yellow"}}
     end
     HttpPost("api/meeting/actions",{
-      kind="StartVotingAction",
-      voting={votingTitle=votingTitle,choices=choices,resultVisibility=resultVis,showResultsRealtime=showRT}
+      kind="StartVotingAction", meetingId=State.meetingId,
+      voting={
+        votingTitle=votingTitle, votingDescription="",
+        choices=BuildApiChoices(rawChoices),
+        resultVisibility=resultVis, showResultsRealtime=showRT
+      }
     }, OnStartVoting)
   end
 
   local function StopVoting()
     if State.current ~= "VotingActive" then return end
-    HttpPost("api/meeting/actions",{kind="StopVotingAction"}, OnStopVoting)
+    HttpPost("api/meeting/actions",{kind="StopVotingAction",meetingId=State.meetingId,votingId=State.votingId}, OnStopVoting)
   end
 
   local function StartDiscussion()
     if State.current ~= "MeetingActive" or not State.meetingId then return end
     local item=AgendaData.items and AgendaData.items[State.currentItemIdx]
     HttpPost("api/meeting/actions",{
-      kind="StartDiscussionAction",
+      kind="StartDiscussionAction", meetingId=State.meetingId,
       discussion={title=item and item.title or "", description=""}
     }, function(t,c,d,e,h)
       if c==200 or c==201 then
         State.discussionActive=true
+        State.discussionId = d and d:match("^%s*(.-)%s*$") or nil
         Controls["mtg_discussion_status"].String="Discussione: "..(item and item.title or "")
         Controls["mtg_start_discussion"].IsDisabled=true
         Controls["mtg_stop_discussion"].IsDisabled=false
@@ -1314,7 +1343,7 @@ if Controls then
 
   local function StopDiscussion()
     if not State.discussionActive or not State.meetingId then return end
-    HttpPost("api/meeting/actions",{kind="StopDiscussionAction"}, function(t,c,d,e,h)
+    HttpPost("api/meeting/actions",{kind="StopDiscussionAction",meetingId=State.meetingId,discussionId=State.discussionId}, function(t,c,d,e,h)
       if c==200 or c==204 then
         State.discussionActive=false
         Controls["mtg_discussion_status"].String="Discussione terminata"
