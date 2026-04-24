@@ -453,6 +453,7 @@ if Controls then
   local State = {
     current="NotConnected", meetingId=nil, votingId=nil, discussionId=nil,
     currentItemIdx=1, votingActive=false, discussionActive=false, httpErrCount=0,
+    votingStartTime=0,
   }
   local AgendaData  = { title="", date="", items={} }
   local AgendaStore = {}
@@ -862,8 +863,12 @@ if Controls then
         RefreshVotingResults(res)
       end
     elseif code == 412 or code == 404 then
-      State.votingActive = false
-      if State.current == "VotingActive" then TransitionTo("MeetingActive") end
+      -- Grace period: ignora 412 entro 3s dall'avvio (callback stale o server non ancora pronto)
+      local age = os.time() - (State.votingStartTime or 0)
+      if age > 3 then
+        State.votingActive = false
+        if State.current == "VotingActive" then TransitionTo("MeetingActive") end
+      end
     elseif code ~= 500 then
       HandleHttpError(code, err, "GetVotingResults")
     end
@@ -896,8 +901,9 @@ if Controls then
 
   local function OnStartVoting(tbl, code, data, err, hdrs)
     if code==200 or code==201 then
-      State.httpErrCount=0; State.votingActive=true
+      State.httpErrCount=0
       State.votingId = data and data:match("^%s*(.-)%s*$") or nil
+      State.votingStartTime = os.time()
       -- Azzera risultati della votazione precedente
       for m=1,5 do
         Controls[string.format("vote_result_label_%d",m)].String=""
@@ -907,7 +913,13 @@ if Controls then
       end
       Controls["vote_total_votes"].String=""
       RefreshVotingPanel()
+      -- Pre-popola i label risultato dalle scelte configurate
+      for m=1,5 do
+        local lbl = Controls[string.format("vote_choice_label_%d",m)].String
+        if lbl ~= "" then Controls[string.format("vote_result_label_%d",m)].String = lbl end
+      end
       TransitionTo("VotingActive")
+      State.votingActive=true  -- impostato DOPO TransitionTo per evitare race con timer
       Log("Votazione avviata, id="..(tostring(State.votingId)))
     else Log("StartVoting failed: "..tostring(code).." "..tostring(err)) end
   end
@@ -935,12 +947,16 @@ if Controls then
   local function OnStopVoting(tbl, code, data, err, hdrs)
     if code==200 or code==204 then
       State.httpErrCount=0
+      local closedVotingId = State.votingId  -- cattura prima che parta una nuova votazione
       HttpGet("api/meeting/voting-results", function(t,c,d,e,h)
         if c==200 then
           local ok,res=pcall(rj.decode,d)
           if ok and res then RefreshVotingResults(res); ArchiveVoteResults(res) end
         end
-        State.votingActive=false; TransitionTo("MeetingActive")
+        -- Resetta solo se non è già partita una nuova votazione
+        if State.votingId == closedVotingId then
+          State.votingActive=false; TransitionTo("MeetingActive")
+        end
         Log("Votazione chiusa e archiviata")
       end)
     else Log("StopVoting failed: "..tostring(code)) end
@@ -1310,7 +1326,7 @@ if Controls then
   MeetingTimer.EventHandler = function()
     HttpGet("api/meeting", OnGetMeeting)
     GetRequestSpeakerList()
-    if State.votingActive then
+    if State.votingActive or State.current == "VotingActive" then
       HttpGet("api/meeting/voting-results", OnGetVotingResults)
     end
   end
