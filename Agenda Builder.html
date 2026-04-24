@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Confero Agenda Builder</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #1e1e2e; color: #cdd6f4; min-height: 100vh; }
+  header { background: #2d3550; padding: 16px 24px; display: flex; align-items: center; gap: 16px; border-bottom: 2px solid #a6d189; }
+  header h1 { font-size: 20px; color: #a6e3a1; }
+  header span { font-size: 12px; color: #6c7086; }
+  .main { display: grid; grid-template-columns: 380px 1fr; gap: 0; min-height: calc(100vh - 60px); }
+  .sidebar { background: #24273a; border-right: 1px solid #363a4f; padding: 20px; overflow-y: auto; }
+  .content { padding: 20px; overflow-y: auto; }
+  .section { background: #1e2030; border: 1px solid #363a4f; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  .section h3 { font-size: 13px; color: #a6d189; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
+  label { display: block; font-size: 12px; color: #6c7086; margin-bottom: 4px; margin-top: 10px; }
+  label:first-of-type { margin-top: 0; }
+  input[type=text], input[type=date] { width: 100%; background: #181926; border: 1px solid #363a4f; color: #cdd6f4; padding: 7px 10px; border-radius: 5px; font-size: 13px; }
+  input:focus { outline: none; border-color: #89b4fa; }
+  button { cursor: pointer; border: none; border-radius: 5px; font-size: 13px; padding: 8px 14px; }
+  .btn-primary { background: #89b4fa; color: #1e1e2e; font-weight: 600; }
+  .btn-primary:hover { background: #b4d0ff; }
+  .btn-success { background: #a6e3a1; color: #1e1e2e; font-weight: 600; }
+  .btn-success:hover { background: #c4f0bf; }
+  .btn-danger { background: #f38ba8; color: #1e1e2e; font-weight: 600; }
+  .btn-danger:hover { background: #f5a3b9; }
+  .btn-muted { background: #363a4f; color: #cdd6f4; }
+  .btn-muted:hover { background: #45475a; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .items-list { display: flex; flex-direction: column; gap: 8px; }
+  .item-card { background: #1e2030; border: 1px solid #363a4f; border-radius: 6px; padding: 12px; cursor: pointer; transition: border-color .15s; position: relative; }
+  .item-card:hover { border-color: #89b4fa; }
+  .item-card.selected { border-color: #89b4fa; background: #24283b; }
+  .item-card .item-num { font-size: 11px; color: #6c7086; }
+  .item-card .item-title { font-size: 14px; margin-top: 2px; }
+  .item-card .item-badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 10px; margin-top: 5px; }
+  .badge-vote { background: #45475a; color: #a6e3a1; }
+  .badge-novote { background: #45475a; color: #6c7086; }
+  .item-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; }
+  .detail-panel { background: #1e2030; border: 1px solid #363a4f; border-radius: 8px; padding: 20px; }
+  .detail-panel h3 { font-size: 15px; color: #89b4fa; margin-bottom: 16px; }
+  .choices-grid { display: grid; grid-template-columns: 1fr 120px 70px; gap: 6px; align-items: center; margin-top: 8px; }
+  .choices-grid .col-hdr { font-size: 11px; color: #6c7086; }
+  .choices-grid input[type=color] { width: 60px; height: 28px; border: 1px solid #363a4f; border-radius: 4px; background: #181926; cursor: pointer; padding: 2px; }
+  .choices-grid .btn-remove { background: none; border: none; color: #f38ba8; font-size: 16px; cursor: pointer; padding: 2px 6px; }
+  .toggle-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .toggle { position: relative; width: 38px; height: 20px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: #363a4f; border-radius: 20px; transition: .2s; cursor: pointer; }
+  .toggle input:checked + .toggle-slider { background: #a6e3a1; }
+  .toggle-slider:before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: .2s; }
+  .toggle input:checked + .toggle-slider:before { transform: translateX(18px); }
+  .output-area { background: #181926; border: 1px solid #363a4f; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 11px; color: #a6e3a1; min-height: 80px; word-break: break-all; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .radio-group { display: flex; gap: 8px; margin-top: 6px; }
+  .radio-group label { display: flex; align-items: center; gap: 5px; margin: 0; cursor: pointer; color: #cdd6f4; font-size: 13px; }
+  .radio-group input[type=radio] { accent-color: #89b4fa; }
+  .empty-state { text-align: center; color: #6c7086; padding: 40px 20px; }
+  .empty-state .icon { font-size: 40px; margin-bottom: 10px; }
+  .num-badge { display: inline-block; background: #363a4f; color: #89b4fa; font-size: 11px; border-radius: 4px; padding: 1px 6px; min-width: 22px; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Confero Agenda Builder</h1>
+    <span>Crea l'ordine del giorno e genera il JSON per il plugin Q-SYS</span>
+  </div>
+</header>
+
+<div class="main">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="section">
+      <h3>Riunione</h3>
+      <label>Titolo riunione</label>
+      <input type="text" id="mtgTitle" placeholder="Es. Consiglio Comunale" value="">
+      <label>Data</label>
+      <input type="date" id="mtgDate">
+    </div>
+
+    <div class="section">
+      <h3>Punti all'ordine del giorno <span class="num-badge" id="itemCount">0</span></h3>
+      <div class="toolbar">
+        <button class="btn-primary btn-sm" onclick="addItem()">+ Aggiungi punto</button>
+        <button class="btn-muted btn-sm" onclick="moveSelected(-1)">↑ Su</button>
+        <button class="btn-muted btn-sm" onclick="moveSelected(1)">↓ Giù</button>
+        <button class="btn-danger btn-sm" onclick="removeSelected()">✕ Rimuovi</button>
+      </div>
+      <div class="items-list" id="itemsList">
+        <div class="empty-state"><div class="icon">📋</div>Nessun punto. Premi "+ Aggiungi punto".</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+    <div id="detailPanel">
+      <div class="empty-state" style="padding:80px 20px">
+        <div class="icon">👈</div>
+        Seleziona o aggiungi un punto per modificarlo.
+      </div>
+    </div>
+
+    <div class="section" style="margin-top:20px">
+      <h3>Output JSON per il plugin</h3>
+      <div class="toolbar">
+        <button class="btn-success" onclick="generateJSON()">⚡ Genera JSON</button>
+        <button class="btn-primary" onclick="copyJSON()">📋 Copia JSON</button>
+        <button class="btn-muted btn-sm" onclick="clearAll()">🗑 Azzera tutto</button>
+      </div>
+      <div class="output-area" id="jsonOutput">Il JSON apparirà qui dopo aver premuto "Genera JSON".</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PRESET_CHOICES = [
+  {label:"Sì/Yes", color:"#00AA00"},
+  {label:"No",     color:"#CC0000"},
+  {label:"Astenuto/Abstain", color:"#CCAA00"},
+];
+
+let items = [];
+let selectedIdx = null;
+
+function addItem() {
+  items.push({
+    title: "Nuovo punto",
+    voteTitle: "",
+    hasVote: false,
+    numChoices: 3,
+    choices: PRESET_CHOICES.map(c=>({...c})),
+    resultVisibility: "Public",
+    showRealtime: true,
+  });
+  selectedIdx = items.length - 1;
+  renderAll();
+}
+
+function removeSelected() {
+  if (selectedIdx === null) return;
+  items.splice(selectedIdx, 1);
+  selectedIdx = items.length > 0 ? Math.min(selectedIdx, items.length-1) : null;
+  renderAll();
+}
+
+function moveSelected(dir) {
+  if (selectedIdx === null) return;
+  const ni = selectedIdx + dir;
+  if (ni < 0 || ni >= items.length) return;
+  [items[selectedIdx], items[ni]] = [items[ni], items[selectedIdx]];
+  selectedIdx = ni;
+  renderAll();
+}
+
+function selectItem(i) {
+  saveCurrentDetail();
+  selectedIdx = i;
+  renderAll();
+}
+
+function saveCurrentDetail() {
+  if (selectedIdx === null) return;
+  const item = items[selectedIdx];
+  if (!item) return;
+  const t = document.getElementById('det_title');
+  const vt = document.getElementById('det_vote_title');
+  if (t) item.title = t.value;
+  if (vt) item.voteTitle = vt.value;
+  const hv = document.getElementById('det_has_vote');
+  if (hv) item.hasVote = hv.checked;
+  const nc = document.getElementById('det_num_choices');
+  if (nc) item.numChoices = parseInt(nc.value) || 3;
+  const rv = document.querySelector('input[name="resultVis"]:checked');
+  if (rv) item.resultVisibility = rv.value;
+  const rt = document.getElementById('det_realtime');
+  if (rt) item.showRealtime = rt.checked;
+  for (let i = 0; i < 5; i++) {
+    const lbl = document.getElementById('choice_label_'+i);
+    const col = document.getElementById('choice_color_'+i);
+    if (lbl && col) {
+      if (!item.choices[i]) item.choices[i] = {};
+      item.choices[i].label = lbl.value;
+      item.choices[i].color = col.value;
+    }
+  }
+}
+
+function renderAll() {
+  saveCurrentDetail();
+  renderList();
+  renderDetail();
+  document.getElementById('itemCount').textContent = items.length;
+}
+
+function renderList() {
+  const el = document.getElementById('itemsList');
+  if (items.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">📋</div>Nessun punto. Premi "+ Aggiungi punto".</div>';
+    return;
+  }
+  el.innerHTML = items.map((item, i) => `
+    <div class="item-card ${i===selectedIdx?'selected':''}" onclick="selectItem(${i})">
+      <div class="item-num">Punto ${i+1}</div>
+      <div class="item-title">${esc(item.title || '—')}</div>
+      <span class="item-badge ${item.hasVote?'badge-vote':'badge-novote'}">${item.hasVote?'✓ Votazione':'Senza voto'}</span>
+    </div>
+  `).join('');
+}
+
+function renderDetail() {
+  const panel = document.getElementById('detailPanel');
+  if (selectedIdx === null || !items[selectedIdx]) {
+    panel.innerHTML = '<div class="empty-state" style="padding:80px 20px"><div class="icon">👈</div>Seleziona un punto per modificarlo.</div>';
+    return;
+  }
+  const item = items[selectedIdx];
+  const n = item.numChoices || 3;
+
+  let choicesHTML = `
+    <div class="choices-grid">
+      <div class="col-hdr">Etichetta</div>
+      <div class="col-hdr">Colore HEX</div>
+      <div class="col-hdr">Preview</div>
+  `;
+  for (let i = 0; i < 5; i++) {
+    const ch = item.choices[i] || {label:'', color:'#888888'};
+    const disabled = i >= n ? 'style="opacity:.35;pointer-events:none"' : '';
+    choicesHTML += `
+      <div ${disabled}><input type="text" id="choice_label_${i}" value="${esc(ch.label)}" placeholder="Scelta ${i+1}" oninput="liveUpdate()"></div>
+      <div ${disabled}><input type="color" id="choice_color_${i}" value="${ch.color}" oninput="liveUpdate()"></div>
+      <div ${disabled} style="display:flex;align-items:center"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:${ch.color}"></span></div>
+    `;
+  }
+  choicesHTML += '</div>';
+
+  panel.innerHTML = `
+    <div class="detail-panel">
+      <h3>Punto ${selectedIdx+1} — Dettaglio</h3>
+      <label>Titolo punto</label>
+      <input type="text" id="det_title" value="${esc(item.title)}" oninput="liveUpdate()">
+
+      <div class="toggle-row" style="margin-top:14px">
+        <label class="toggle"><input type="checkbox" id="det_has_vote" ${item.hasVote?'checked':''} onchange="toggleVote()"><span class="toggle-slider"></span></label>
+        <span style="font-size:13px">Punto con votazione</span>
+      </div>
+
+      <div id="vote_section" style="${item.hasVote?'':'display:none'}">
+        <label style="margin-top:14px">Titolo votazione</label>
+        <input type="text" id="det_vote_title" value="${esc(item.voteTitle)}" placeholder="(lascia vuoto = usa titolo punto)" oninput="liveUpdate()">
+
+        <label style="margin-top:14px">Numero scelte: <strong id="nc_display">${n}</strong></label>
+        <input type="range" id="det_num_choices" min="2" max="5" value="${n}" oninput="updateNC(this.value)" style="width:200px;accent-color:#89b4fa">
+
+        <label style="margin-top:14px">Scelte / Choices</label>
+        ${choicesHTML}
+        <button class="btn-muted btn-sm" onclick="applyPreset()" style="margin-top:8px">↺ Preset Sì/No/Astensione</button>
+
+        <label style="margin-top:14px">Visibilità risultati</label>
+        <div class="radio-group">
+          <label><input type="radio" name="resultVis" value="Public" ${item.resultVisibility!=='Individual'?'checked':''}> Pubblico</label>
+          <label><input type="radio" name="resultVis" value="Individual" ${item.resultVisibility==='Individual'?'checked':''}> Individuale</label>
+        </div>
+
+        <div class="toggle-row" style="margin-top:12px">
+          <label class="toggle"><input type="checkbox" id="det_realtime" ${item.showRealtime?'checked':''}><span class="toggle-slider"></span></label>
+          <span style="font-size:13px">Risultati in tempo reale</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function liveUpdate() {
+  if (selectedIdx === null) return;
+  const item = items[selectedIdx];
+  const t = document.getElementById('det_title');
+  if (t) { item.title = t.value; renderList(); }
+}
+
+function toggleVote() {
+  saveCurrentDetail();
+  if (selectedIdx === null) return;
+  items[selectedIdx].hasVote = document.getElementById('det_has_vote').checked;
+  renderAll();
+}
+
+function updateNC(val) {
+  saveCurrentDetail();
+  if (selectedIdx === null) return;
+  items[selectedIdx].numChoices = parseInt(val);
+  document.getElementById('nc_display').textContent = val;
+  renderDetail();
+}
+
+function applyPreset() {
+  if (selectedIdx === null) return;
+  items[selectedIdx].choices = PRESET_CHOICES.map(c=>({...c}));
+  items[selectedIdx].numChoices = 3;
+  renderDetail();
+}
+
+function generateJSON() {
+  saveCurrentDetail();
+  const date = document.getElementById('mtgDate').value || new Date().toISOString().slice(0,10);
+  const [y,m,d] = date.split('-');
+  const dateIT = `${d}/${m}/${y}`;
+
+  const payload = {
+    title: document.getElementById('mtgTitle').value || "Nuova Riunione",
+    date: dateIT,
+    items: items.map(item => {
+      const obj = { title: item.title };
+      if (item.hasVote) {
+        const n = item.numChoices || 3;
+        obj.voting = {
+          title: item.voteTitle || item.title,
+          numChoices: n,
+          choices: item.choices.slice(0, n).map((ch, i) => ({
+            label: ch.label || `Scelta ${i+1}`,
+            color: ch.color || '#888888',
+          })),
+          resultVisibility: item.resultVisibility || 'Public',
+          showRealtime: item.showRealtime !== false,
+        };
+      }
+      return obj;
+    })
+  };
+
+  const json = JSON.stringify(payload);
+  document.getElementById('jsonOutput').textContent = json;
+}
+
+function copyJSON() {
+  generateJSON();
+  const text = document.getElementById('jsonOutput').textContent;
+  if (text && text !== 'Il JSON apparirà qui dopo aver premuto "Genera JSON".') {
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = event.target;
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copiato!';
+      setTimeout(()=>btn.textContent=orig, 1500);
+    });
+  }
+}
+
+function clearAll() {
+  if (!confirm('Azzerare tutto?')) return;
+  items = [];
+  selectedIdx = null;
+  document.getElementById('mtgTitle').value = '';
+  document.getElementById('mtgDate').value = '';
+  document.getElementById('jsonOutput').textContent = 'Il JSON apparirà qui dopo aver premuto "Genera JSON".';
+  renderAll();
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Init
+document.getElementById('mtgDate').value = new Date().toISOString().slice(0,10);
+renderAll();
+</script>
+</body>
+</html>
