@@ -625,15 +625,25 @@ if Controls then
       Licensed = true; LicensedHwId = "Emulazione"
       ApplyLicenseState(); return
     end
+    -- Tenta prima System.SerialNumber (proprietà Lua nativa Q-SYS, no HTTP)
+    local sn = (type(System.SerialNumber) == "string") and System.SerialNumber or ""
+    if sn ~= "" then
+      Log("CheckLicense: S/N=" .. sn)
+      LicensedHwId = sn
+      Licensed = (Properties["LicenseKey"].Value == computeLicenseKey(sn))
+      ApplyLicenseState(); return
+    end
+    -- Fallback: Core Manager REST API (HTTP porta 80)
     Controls["license_status"].String = "Verifica licenza in corso..."
     Controls["ConnectServer"].IsDisabled = true
     HttpClient.Download({
-      Url = HttpClient.CreateUrl({Host="https://127.0.0.1", Port=443, Path="api/v0/cores"}),
+      Url = HttpClient.CreateUrl({Host="http://127.0.0.1", Port=80, Path="api/v0/cores"}),
       Method = "GET",
       Headers = {["Accept"]="application/json"},
       Timeout = 5,
       VerifyPeer = false,
       EventHandler = function(t, code, data, err, hdrs)
+        Log(string.format("CheckLicense HTTP %s '%s'", tostring(code), tostring(err or "")))
         local hwid = ""
         if code == 200 then
           local ok, res = pcall(rj.decode, data)
@@ -642,7 +652,7 @@ if Controls then
             hwid = tostring(first.hardwareId or first.hardwareID or "")
           end
         end
-        LicensedHwId = hwid
+        LicensedHwId = hwid ~= "" and hwid or ("HTTP:"..tostring(code))
         if hwid ~= "" then
           Licensed = (Properties["LicenseKey"].Value == computeLicenseKey(hwid))
         else
