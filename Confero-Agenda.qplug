@@ -1,6 +1,6 @@
 PluginInfo = {
   Name        = "Confero~Agenda Manager",
-  Version     = "2.2.5",
+  Version     = "2.2.6",
   Id          = "Confero.AgendaManager.v2",
   Description = "Gestione ordine del giorno, votazioni, sedili e audio – Televic Confero (Plixus/G4)",
   Author      = "Matteo Fioretto – Prase, a Midwich company"
@@ -21,7 +21,7 @@ function GetProperties()
     { Name="Server IP",      Type="string",  Value="192.168.1.1" },
     { Name="Use HTTPS",      Type="boolean", Value=true },
     { Name="Bearer Token",   Type="string",  Value="" },
-    { Name="Data File Path", Type="string",  Value="media/agendas.json" },
+    { Name="Data File Path", Type="string",  Value="media/Televic Meeting/agendas.json" },
     { Name="Seats",          Type="integer", Min=1, Max=300, Value=25 },
     { Name="LicenseKey",     Type="string",  Value="" },
   }
@@ -183,11 +183,11 @@ function GetControlLayout(props)
   end
   local function connbar()
     table.insert(graphics,{Type="GroupBox",Fill={35,42,52},StrokeWidth=0,CornerRadius=0,Position={0,38},Size={W,30}})
-    layout["Status"]          ={Style="Status",Position={2,8},Size={18,22}}
-    layout["conn_status_led"] ={Style="Led",Position={14,47},Size={14,14},Color=C.Grn,OffColor=C.Red,UnlinkOffColor=true}
-    layout["conn_status_text"]={Style="Text",Position={34,45},Size={140,22},IsReadOnly=true,FontSize=9}
-    layout["ConnectServer"]   ={Style="Button",Position={182,45},Size={88,22},Legend="Connetti",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
-    layout["ConnectStatus"]   ={Style="ComboBox",Position={278,45},Size={90,22}}
+    layout["conn_status_led"] ={Style="Led",Position={6,47},Size={14,14},Color=C.Grn,OffColor=C.Red,UnlinkOffColor=true}
+    layout["conn_status_text"]={Style="Text",Position={24,45},Size={148,22},IsReadOnly=true,FontSize=9}
+    layout["ConnectServer"]   ={Style="Button",Position={180,45},Size={88,22},Legend="Connetti",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["ConnectStatus"]   ={Style="ComboBox",Position={276,45},Size={90,22}}
+    layout["Status"]          ={Style="Status",Position={374,44},Size={22,22}}
     layout["debug_log"]       ={Style="Text",Position={0,680},Size={W,50},IsReadOnly=true,FontSize=10}
   end
 
@@ -677,6 +677,11 @@ if Controls then
   -- ── Persistence ──────────────────────────────────────────────────────────────
   local function SaveToFile()
     local path = Properties["Data File Path"].Value
+    local dir  = path:match("^(.*[/\\])") or ""
+    if dir ~= "" then
+      local ok_lfs, lfs_mod = pcall(require, "lfs")
+      if ok_lfs and lfs_mod then pcall(lfs_mod.mkdir, dir) end
+    end
     local ok, err = pcall(function()
       local f = io.open(path,"w")
       if not f then error("cannot open "..path) end
