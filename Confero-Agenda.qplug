@@ -644,12 +644,15 @@ if Controls then
       VerifyPeer = false,
       EventHandler = function(t, code, data, err, hdrs)
         Log(string.format("CheckLicense HTTP %s '%s'", tostring(code), tostring(err or "")))
+        Log("CL data: " .. tostring(data or ""):sub(1,120))
         local hwid = ""
         if code == 200 then
           local ok, res = pcall(rj.decode, data)
+          Log("CL json ok=" .. tostring(ok) .. " type=" .. type(res))
           if ok and res then
             local first = (type(res) == "table" and res[1]) or (res.cores and res.cores[1]) or res
-            hwid = tostring(first.hardwareId or first.hardwareID or "")
+            Log("CL first keys: " .. tostring(first.hardwareId) .. " / " .. tostring(first.hardwareID) .. " / " .. tostring(first.serialNo))
+            hwid = tostring(first.hardwareId or first.hardwareID or first.serialNo or "")
           end
         end
         LicensedHwId = hwid ~= "" and hwid or ("HTTP:"..tostring(code))
