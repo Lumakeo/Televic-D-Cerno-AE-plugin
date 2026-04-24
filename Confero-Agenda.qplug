@@ -1,6 +1,6 @@
 PluginInfo = {
   Name        = "Confero~Agenda Manager",
-  Version     = "2.2.0",
+  Version     = "2.2.5",
   Id          = "Confero.AgendaManager.v2",
   Description = "Gestione ordine del giorno, votazioni, sedili e audio – Televic Confero (Plixus/G4)",
   Author      = "Matteo Fioretto – Prase, a Midwich company"
@@ -21,7 +21,7 @@ function GetProperties()
     { Name="Server IP",      Type="string",  Value="192.168.1.1" },
     { Name="Use HTTPS",      Type="boolean", Value=true },
     { Name="Bearer Token",   Type="string",  Value="" },
-    { Name="Data File Path", Type="string",  Value="/data/agendas.json" },
+    { Name="Data File Path", Type="string",  Value="media/agendas.json" },
     { Name="Seats",          Type="integer", Min=1, Max=300, Value=25 },
     { Name="LicenseKey",     Type="string",  Value="" },
   }
@@ -82,6 +82,9 @@ function GetControls(props)
   add{Name="odg_json_import",        ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_do_export",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_do_import",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_file_list",          ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_scan_folder",        ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="odg_load_file",          ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
 
   -- Tab 2: Riunione
   add{Name="mtg_status_led",         ControlType="Indicator",IndicatorType="Led",PinStyle="Output",UserPin=true,Count=1}
@@ -261,6 +264,13 @@ function GetControlLayout(props)
     lbl("Import JSON:",556,582,80,12,9)
     layout["odg_json_import"]={Style="Text",Position={556,596},Size={532,60}}
     layout["odg_do_import"]  ={Style="Button",Position={556,660},Size={120,18},Legend="Importa",Color=C.Blu}
+
+    sep(682)
+    lbl("Agenda disponibili:",10,688,160,12,9)
+    layout["odg_file_list"]   ={Style="ComboBox",Position={10,702},Size={W-130,22}}
+    layout["odg_scan_folder"] ={Style="Button",Position={W-116,702},Size={106,22},Legend="Cerca file JSON"}
+    layout["odg_load_file"]   ={Style="Button",Position={10,728},Size={180,22},Legend="Carica selezionato",Color=C.Blu}
+    layout["debug_log"]       ={Style="Text",Position={0,756},Size={W,50},IsReadOnly=true,FontSize=10}
 
   -- ── Page 2: Riunione ─────────────────────────────────────────────────────────
   elseif pg == 2 then
@@ -688,6 +698,60 @@ if Controls then
         if data.current then AgendaData =data.current end
       end
     end)
+  end
+
+  local function ScanAgendaFolder()
+    local path = Properties["Data File Path"].Value
+    local folder = path:match("^(.*[/\\])") or "media/"
+    local files = {}
+    local ok_lfs, lfs_mod = pcall(require, "lfs")
+    if ok_lfs and lfs_mod then
+      pcall(function()
+        for f in lfs_mod.dir(folder) do
+          if f:match("%.json$") then table.insert(files, f) end
+        end
+      end)
+    else
+      local ok_p, pipe = pcall(io.popen, 'ls -1 "'..folder..'" 2>/dev/null')
+      if ok_p and pipe then
+        for line in pipe:lines() do
+          if line:match("%.json$") then table.insert(files, line) end
+        end
+        pipe:close()
+      end
+    end
+    table.sort(files)
+    if #files == 0 then
+      Controls["odg_file_list"].Choices = {"(nessun file JSON trovato)"}
+      Log("Scan: nessun file JSON in " .. folder)
+    else
+      Controls["odg_file_list"].Choices = files
+      Controls["odg_file_list"].String = files[1]
+      Log(string.format("Scan: %d file in %s", #files, folder))
+    end
+  end
+
+  local function LoadSelectedFile()
+    local selected = Controls["odg_file_list"].String
+    if not selected or selected == "" or selected == "(nessun file JSON trovato)" then
+      Log("Nessun file selezionato"); return
+    end
+    local path = Properties["Data File Path"].Value
+    local folder = path:match("^(.*[/\\])") or "media/"
+    local fullpath = folder .. selected
+    local f = io.open(fullpath, "r")
+    if not f then Log("Errore apertura: " .. fullpath); return end
+    local raw = f:read("*all"); f:close()
+    local ok, data = pcall(rj.decode, raw)
+    if ok and data then
+      if data.store   then AgendaStore = data.store end
+      if data.current then AgendaData  = data.current end
+      currentAgendaPage = 1
+      RefreshAgendaPage()
+      Log("Caricato: " .. selected)
+    else
+      Log("Errore parsing: " .. selected)
+    end
   end
 
   -- ── UI Refresh ────────────────────────────────────────────────────────────────
@@ -1740,6 +1804,9 @@ if Controls then
       Log("Importato: "..#AgendaData.items.." punti")
     else Log("Import error: JSON non valido") end
   end
+
+  Controls["odg_scan_folder"].EventHandler = function() ScanAgendaFolder() end
+  Controls["odg_load_file"].EventHandler   = function() LoadSelectedFile() end
 
   Controls["res_clear"].EventHandler = function()
     ResultsData={}; RefreshResultsTab(); Log("Risultati cancellati")

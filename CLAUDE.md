@@ -14,7 +14,7 @@ git add -A && git commit -m "<description>" && git push origin main
 
 ## Progetto: Confero Agenda Manager
 
-### Stato attuale (2026-04-24) — v2.2.4 (commit `ba54a42`)
+### Stato attuale (2026-04-24) — v2.2.5
 
 Plugin Q-SYS in Lua per gestione ordine del giorno, votazioni, sedili e audio su **Televic Confero (Plixus/G4)**.
 
@@ -33,7 +33,7 @@ Plugin Q-SYS in Lua per gestione ordine del giorno, votazioni, sedili e audio su
 - Controlli dinamici: `SeatButton_N` e `RequestLED_N` (loop su `props["Seats"].Value`)
 - State machine: `NotConnected → MeetingReady → MeetingActive → VotingActive`
 - Auth: `Bearer Token` — JSON via `require("json")`
-- Persistenza OdG su file — default `/data/agendas.json` (percorso assoluto Q-SYS)
+- Persistenza OdG su file — default `media/agendas.json` (percorso relativo Q-SYS, cartella media)
 - Data formato italiano `GG/MM/AAAA` nel display; convertita in `YYYY-MM-DD` per l'API
 - Finestra: **1100px** di larghezza
 
@@ -139,6 +139,7 @@ State = { current, meetingId, votingId, discussionId, currentItemIdx,
 | v2.2.2 | `54b0ae0` | `CheckLicense`: usa `System.SerialNumber` (nativo Lua) prima di HTTP; fallback HTTP porta 80 (non 443); `System.IsEmulating` senza parentesi (è proprietà, non funzione) |
 | v2.2.3 | `7693e1d` | `OnStartVoting` azzera `vote_result_*` e chiama `RefreshVotingPanel()` alla partenza; log diagnostico VoteResults; note: API Plixus non espone conteggi live (tot=0 durante votazione) |
 | v2.2.4 | `ba54a42` | Fix race condition polling: `votingStartTime` + grace period 3s per 412; `votingActive=true` impostato DOPO `TransitionTo`; `OnStopVoting` cattura `closedVotingId`; `MeetingTimer` polla anche su `State.current=="VotingActive"`; pre-popola label risultato da choice label |
+| v2.2.5 | — | Fix path file OdG: default `media/agendas.json` (era `/data/agendas.json`); aggiunto folder scanner nel Tab 1: `Cerca file JSON` scansiona la cartella e lista i `.json` disponibili; `Carica selezionato` carica l'OdG dal file scelto |
 
 ---
 
@@ -146,7 +147,7 @@ State = { current, meetingId, votingId, discussionId, currentItemIdx,
 
 - `Count>1` nei controlli genera nomi con spazio (`"nome 1"`) → sempre `nil` a runtime. Usare loop con `nome_N`.
 - `.Choices={val}` ignorato su `Style="Text"` → usare `.String=tostring(val)`.
-- `io.open` con path relativo fallisce → usare percorso assoluto (es. `/data/agendas.json`).
+- `io.open` usa percorsi relativi con prefisso `media/` (es. `media/agendas.json`). Percorsi assoluti tipo `/data/agendas.json` non funzionano sul Core.
 - Risposte API UUID sono stringhe grezze (non JSON) → parsare con `data:match("^%s*(.-)%s*$")`.
 - `GET api/meeting` → 412 quando nessuna riunione attiva (gestito come 404).
 - `HttpClient.Download` accetta URL da `HttpClient.CreateUrl({Host, Port, Path})`.
@@ -178,9 +179,9 @@ State = { current, meetingId, votingId, discussionId, currentItemIdx,
 
 ## Note file OdG
 
-- Percorso default `/data/agendas.json` — se Core restituisce "cannot open", cambiare in `/tmp/agendas.json` nelle Properties.
+- Percorso default `media/agendas.json` — relativo alla cartella media Q-SYS. Modificabile nelle Properties.
 - "Genera Export" → JSON nel campo testo (copia/incolla). "Salva" → scrive su file nel Core.
+- "Cerca file JSON" (Tab 1, in basso) → scansiona la cartella del file configurato e lista tutti i `.json` disponibili. "Carica selezionato" → carica il file scelto.
 
 ### Prossimi passi
-1. Verificare percorso file OdG scrivibile sul Core hardware (provare `/tmp/agendas.json`)
-2. Testare risultati post-votazione: dopo chiusura i conteggi finali devono apparire correttamente
+1. Testare risultati post-votazione: dopo chiusura i conteggi finali devono apparire correttamente
