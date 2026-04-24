@@ -621,7 +621,7 @@ if Controls then
   end
 
   local function CheckLicense()
-    if System.IsEmulating() then
+    if System.IsEmulating then
       Licensed = true; LicensedHwId = "Emulazione"
       ApplyLicenseState(); return
     end
