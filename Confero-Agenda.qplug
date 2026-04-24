@@ -1,6 +1,6 @@
 PluginInfo = {
   Name        = "Confero~Agenda Manager",
-  Version     = "2.1.0",
+  Version     = "2.2.0",
   Id          = "Confero.AgendaManager.v2",
   Description = "Gestione ordine del giorno, votazioni, sedili e audio – Televic Confero (Plixus/G4)",
   Author      = "Matteo Fioretto – Prase, a Midwich company"
@@ -23,6 +23,7 @@ function GetProperties()
     { Name="Bearer Token",   Type="string",  Value="" },
     { Name="Data File Path", Type="string",  Value="/data/agendas.json" },
     { Name="Seats",          Type="integer", Min=1, Max=300, Value=25 },
+    { Name="LicenseKey",     Type="string",  Value="" },
   }
 end
 
@@ -151,7 +152,9 @@ function GetControls(props)
   add{Name="GetWirelessUnits",   ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
 
   -- Tab 7: Info
-  add{Name="info_display", ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="info_display",    ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
+  add{Name="license_core_id", ControlType="Text",PinStyle="Output",UserPin=true,Count=1}
+  add{Name="license_status",  ControlType="Text",PinStyle="Output",UserPin=true,Count=1}
 
   return ctrls
 end
@@ -422,7 +425,12 @@ function GetControlLayout(props)
   elseif pg == 7 then
     hdr("Info")
     connbar()
-    layout["info_display"]={Style="Text",Position={50,80},Size={W-100,570},IsReadOnly=true,FontSize=13}
+    gbox("Licenza",4,76,W-8,120)
+    lbl("Core Hardware ID:",14,92,180,14,9)
+    layout["license_core_id"]={Style="Text",Position={14,108},Size={W-28,22},IsReadOnly=true,FontSize=9}
+    lbl("Stato licenza:",14,136,140,14,9)
+    layout["license_status"]={Style="Text",Position={14,152},Size={W-28,22},IsReadOnly=true,FontSize=9}
+    layout["info_display"]={Style="Text",Position={50,210},Size={W-100,430},IsReadOnly=true,FontSize=13}
   end
 
   return layout, graphics
@@ -438,6 +446,9 @@ if Controls then
   SeatTimer     = Timer.New()
   MeetingTimer  = Timer.New()
   RecordingTimer= Timer.New()
+
+  local Licensed    = false
+  local LicensedHwId = ""
 
   local State = {
     current="NotConnected", meetingId=nil, votingId=nil, discussionId=nil,
@@ -570,6 +581,76 @@ if Controls then
       TransitionTo("NotConnected")
       State.httpErrCount = 0
     end
+  end
+
+  -- ── License ──────────────────────────────────────────────────────────────────
+  local function computeLicenseKey(hardwareId)
+    local SECRET = "CONFERO_PRASE_MIDWICH_2026"
+    local s = hardwareId .. SECRET
+    local MOD = 1000000000
+    local h = 0
+    for i = 1, #s do h = (h * 31 + string.byte(s, i)) % MOD end
+    local h2 = 0
+    local len = #s
+    for i = len, 1, -1 do
+      local pos = len - i
+      h2 = (h2 * 37 + string.byte(s, i) * ((pos % 7) + 1)) % MOD
+    end
+    local CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    local function enc(n, length)
+      local r = ""
+      for _ = 1, length do
+        r = r .. string.sub(CHARS, (n % 32) + 1, (n % 32) + 1)
+        n = math.floor(n / 32)
+      end
+      return r
+    end
+    return enc(h,4).."-"..enc(h2,4).."-"..enc((h+h2)%MOD,4)
+  end
+
+  local function ApplyLicenseState()
+    Controls["license_core_id"].String = LicensedHwId ~= "" and LicensedHwId or "Non disponibile"
+    if Licensed then
+      Controls["license_status"].String = (LicensedHwId == "Emulazione") and "Modalità emulazione – licenza non richiesta" or "Licenza valida"
+      Controls["ConnectServer"].IsDisabled = false
+    else
+      Controls["license_status"].String = "Licenza non valida – contattare Prase/Midwich per una chiave"
+      Controls["ConnectServer"].IsDisabled = true
+      Controls["ConnectServer"].Boolean = false
+    end
+  end
+
+  local function CheckLicense()
+    if System.IsEmulating() then
+      Licensed = true; LicensedHwId = "Emulazione"
+      ApplyLicenseState(); return
+    end
+    Controls["license_status"].String = "Verifica licenza in corso..."
+    Controls["ConnectServer"].IsDisabled = true
+    HttpClient.Download({
+      Url = HttpClient.CreateUrl({Host="https://127.0.0.1", Port=443, Path="api/v0/cores"}),
+      Method = "GET",
+      Headers = {["Accept"]="application/json"},
+      Timeout = 5,
+      VerifyPeer = false,
+      EventHandler = function(t, code, data, err, hdrs)
+        local hwid = ""
+        if code == 200 then
+          local ok, res = pcall(rj.decode, data)
+          if ok and res then
+            local first = (type(res) == "table" and res[1]) or (res.cores and res.cores[1]) or res
+            hwid = tostring(first.hardwareId or first.hardwareID or "")
+          end
+        end
+        LicensedHwId = hwid
+        if hwid ~= "" then
+          Licensed = (Properties["LicenseKey"].Value == computeLicenseKey(hwid))
+        else
+          Licensed = false
+        end
+        ApplyLicenseState()
+      end
+    })
   end
 
   -- ── Persistence ──────────────────────────────────────────────────────────────
@@ -1381,6 +1462,11 @@ if Controls then
   -- ── Event handlers ────────────────────────────────────────────────────────────
   Controls["ConnectServer"].EventHandler = function(ctl)
     if ctl.Boolean then
+      if not Licensed then
+        Log("Licenza non valida – connessione bloccata")
+        ctl.Boolean = false
+        return
+      end
       Initialize()
     else
       StopAllTimers()
@@ -1678,8 +1764,10 @@ if Controls then
   Controls["StartRecording"].Legend = "Start Recording"
 
   Controls["info_display"].String = string.format(
-    "Plugin: Confero Agenda Manager\nVersione: %s\nAutore: Matteo Fioretto\nPer: Prase, a Midwich company\nSistemi: Plixus, G4\nAPI: Confero REST v7.17\n\n© 2026 Tutti i diritti riservati",
+    "Plugin: Confero Agenda Manager\nVersione: %s\nAutore: Matteo Fioretto\nPer: Prase, a Midwich company\nSistemi: Plixus, G4\nAPI: Confero REST v7.17\n\nLicenza: inserire la chiave nella proprietà LicenseKey.\nPer richiedere una chiave contattare Prase/Midwich.\n\n© 2026 Tutti i diritti riservati",
     PluginInfo.Version)
+
+  CheckLicense()
 
   RefreshAgendaPage()
   RefreshDetailPanel()
