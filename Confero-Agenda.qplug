@@ -1,6 +1,6 @@
 PluginInfo = {
   Name        = "Confero~Agenda Manager",
-  Version     = "2.2.6",
+  Version     = "2.2.7",
   Id          = "Confero.AgendaManager.v2",
   Description = "Gestione ordine del giorno, votazioni, sedili e audio – Televic Confero (Plixus/G4)",
   Author      = "Matteo Fioretto – Prase, a Midwich company"
@@ -677,10 +677,15 @@ if Controls then
   -- ── Persistence ──────────────────────────────────────────────────────────────
   local function SaveToFile()
     local path = Properties["Data File Path"].Value
-    local dir  = path:match("^(.*[/\\])") or ""
+    local dir  = (path:match("^(.*[/\\])") or ""):gsub("[/\\]$","")
     if dir ~= "" then
       local ok_lfs, lfs_mod = pcall(require, "lfs")
-      if ok_lfs and lfs_mod then pcall(lfs_mod.mkdir, dir) end
+      if ok_lfs and lfs_mod then
+        local r = lfs_mod.mkdir(dir)
+        Log("mkdir "..dir..": "..(r and "ok" or "già esistente/skip"))
+      else
+        os.execute('mkdir -p "'..dir..'" 2>/dev/null')
+      end
     end
     local ok, err = pcall(function()
       local f = io.open(path,"w")
@@ -1796,7 +1801,15 @@ if Controls then
   Controls["odg_do_export"].EventHandler = function()
     local ok,s=pcall(rj.encode,AgendaData)
     Controls["odg_json_export"].String = ok and s or ("ERRORE: "..tostring(s))
-    if ok then Log("Export JSON generato") else Log("Export error: "..tostring(s)) end
+    if ok then
+      Log("Export JSON generato")
+      if AgendaData.date and AgendaData.date ~= "" then
+        AgendaStore[AgendaData.date]={title=AgendaData.title,date=AgendaData.date,items=AgendaData.items}
+      end
+      SaveToFile()
+    else
+      Log("Export error: "..tostring(s))
+    end
   end
 
   Controls["odg_do_import"].EventHandler = function()

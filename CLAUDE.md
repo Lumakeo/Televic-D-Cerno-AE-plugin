@@ -14,7 +14,7 @@ git add -A && git commit -m "<description>" && git push origin main
 
 ## Progetto: Confero Agenda Manager
 
-### Stato attuale (2026-04-24) — v2.2.6
+### Stato attuale (2026-04-24) — v2.2.7
 
 Plugin Q-SYS in Lua per gestione ordine del giorno, votazioni, sedili e audio su **Televic Confero (Plixus/G4)**.
 
@@ -140,7 +140,8 @@ State = { current, meetingId, votingId, discussionId, currentItemIdx,
 | v2.2.3 | `7693e1d` | `OnStartVoting` azzera `vote_result_*` e chiama `RefreshVotingPanel()` alla partenza; log diagnostico VoteResults; note: API Plixus non espone conteggi live (tot=0 durante votazione) |
 | v2.2.4 | `ba54a42` | Fix race condition polling: `votingStartTime` + grace period 3s per 412; `votingActive=true` impostato DOPO `TransitionTo`; `OnStopVoting` cattura `closedVotingId`; `MeetingTimer` polla anche su `State.current=="VotingActive"`; pre-popola label risultato da choice label |
 | v2.2.5 | `51a11ac` | Fix path file OdG: default `media/agendas.json` (era `/data/agendas.json`); aggiunto folder scanner nel Tab 1: `Cerca file JSON` scansiona la cartella e lista i `.json` disponibili; `Carica selezionato` carica l'OdG dal file scelto |
-| v2.2.6 | — | Fix `Status` ("OK") posizionato in header (y=8) → spostato nella connbar (y=44); default path → `media/Televic Meeting/agendas.json`; `SaveToFile` tenta `lfs.mkdir` sulla directory prima di scrivere |
+| v2.2.6 | `356c3fa` | Fix `Status` ("OK") posizionato in header (y=8) → spostato nella connbar (y=44); default path → `media/Televic Meeting/agendas.json`; `SaveToFile` tenta `lfs.mkdir` sulla directory prima di scrivere |
+| v2.2.7 | — | "Genera Export" scrive anche su file (aggiunge `SaveToFile()`) — prima salvava solo nel campo testo; fix lfs.mkdir: rimuove slash finale; fallback `os.execute mkdir -p`; log mkdir per diagnostica |
 
 ---
 
