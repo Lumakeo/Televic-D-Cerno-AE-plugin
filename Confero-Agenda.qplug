@@ -712,7 +712,7 @@ if Controls then
       Controls["odg_selected_label"].String    = "Nessun punto selezionato"
       Controls["odg_detail_title"].String      = ""
       Controls["odg_detail_vote_title"].String = ""
-      for m=1,6 do
+      for m=1,5 do
         Controls[string.format("odg_detail_choice_label_%d",m)].String=""
         Controls[string.format("odg_detail_choice_color_%d",m)].String=""
       end
@@ -723,8 +723,8 @@ if Controls then
     Controls["odg_detail_vote_title"].String = (item.voting and item.voting.title) or ""
     local n = (item.voting and item.voting.numChoices) or 3
     activeVoteChoiceCount = n
-    for i=1,4 do Controls[string.format("odg_detail_vote_mode_%d",i)].Boolean=(i==n-2) end
-    for m=1,6 do
+    for i=1,3 do Controls[string.format("odg_detail_vote_mode_%d",i)].Boolean=(i==n-2) end
+    for m=1,5 do
       local ch = item.voting and item.voting.choices and item.voting.choices[m]
       Controls[string.format("odg_detail_choice_label_%d",m)].String     = ch and ch.label or ""
       Controls[string.format("odg_detail_choice_color_%d",m)].String     = ch and ch.color or ""
@@ -744,7 +744,7 @@ if Controls then
       Controls["vote_title_display"].String = vt or ""
       local n = (item.voting and item.voting.numChoices) or 3
       Controls["vote_num_choices"].String = string.format("%d scelte", n)
-      for m=1,6 do
+      for m=1,5 do
         local ch = item.voting and item.voting.choices and item.voting.choices[m]
         Controls[string.format("vote_choice_label_%d",m)].String = ch and ch.label or ""
         Controls[string.format("vote_choice_color_%d",m)].String = ch and ch.color or ""
@@ -765,7 +765,7 @@ if Controls then
     local total = 0
     for _,ch in ipairs(choices) do total=total+(ch.count or 0) end
     Controls["vote_total_votes"].String = string.format("Totale: %d voti", total)
-    for m=1,6 do
+    for m=1,5 do
       local ch=choices[m]
       local cnt = ch and (ch.count or 0) or 0
       local pct = (total>0 and ch) and math.floor(cnt/total*100+0.5) or 0
@@ -1402,7 +1402,7 @@ if Controls then
     else
       votingTitle=Controls["vote_manual_title"].String
       rawChoices={}
-      for m=1,6 do
+      for m=1,5 do
         local l=Controls[string.format("vote_choice_label_%d",m)].String
         local c=Controls[string.format("vote_choice_color_%d",m)].String
         if l~="" then table.insert(rawChoices,{label=l,color=c}) end
@@ -1490,7 +1490,7 @@ if Controls then
   Controls["vote_manual_title"].EventHandler    = RefreshVotingPanel
 
   Controls["vote_hide_results"].EventHandler = function()
-    for m=1,6 do
+    for m=1,5 do
       Controls[string.format("vote_result_count_%d",m)].String=""
       Controls[string.format("vote_result_bar_%d",m)].Value=0
       Controls[string.format("vote_result_pct_%d",m)].String=""
@@ -1588,13 +1588,13 @@ if Controls then
     end
   end
 
-  for i=1,4 do
+  for i=1,3 do
     local n=i
     Controls[string.format("odg_detail_vote_mode_%d",n)].EventHandler = function(ctl)
       if ctl.Boolean and selectedLogicalItem>0 and AgendaData.items and AgendaData.items[selectedLogicalItem] then
         activeVoteChoiceCount=n+2
         AgendaData.items[selectedLogicalItem].voting.numChoices=activeVoteChoiceCount
-        for oi=1,4 do if oi~=n then Controls[string.format("odg_detail_vote_mode_%d",oi)].Boolean=false end end
+        for oi=1,3 do if oi~=n then Controls[string.format("odg_detail_vote_mode_%d",oi)].Boolean=false end end
         RefreshDetailPanel()
       end
     end
@@ -1611,7 +1611,7 @@ if Controls then
     RefreshDetailPanel()
   end
 
-  for m=1,6 do
+  for m=1,5 do
     local mm=m
     Controls[string.format("odg_detail_choice_label_%d",mm)].EventHandler = function(ctl)
       if selectedLogicalItem>0 and AgendaData.items and AgendaData.items[selectedLogicalItem] then
