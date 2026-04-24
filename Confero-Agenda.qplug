@@ -657,7 +657,10 @@ if Controls then
         end
         LicensedHwId = hwid ~= "" and hwid or ("HTTP:"..tostring(code))
         if hwid ~= "" then
-          Licensed = (Properties["LicenseKey"].Value == computeLicenseKey(hwid))
+          local computed = computeLicenseKey(hwid)
+          local provided = (Properties["LicenseKey"].Value or ""):match("^%s*(.-)%s*$")
+          Log(string.format("CL chk: prov='%s' comp='%s'", provided, computed))
+          Licensed = (provided == computed)
         else
           Licensed = false
         end
