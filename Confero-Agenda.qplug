@@ -1,6 +1,6 @@
 PluginInfo = {
   Name        = "Confero~Agenda Manager",
-  Version     = "2.0.6",
+  Version     = "2.1.0",
   Id          = "Confero.AgendaManager.v2",
   Description = "Gestione ordine del giorno, votazioni, sedili e audio – Televic Confero (Plixus/G4)",
   Author      = "Matteo Fioretto – Prase, a Midwich company"
@@ -71,10 +71,10 @@ function GetControls(props)
   add{Name="odg_selected_label",     ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_detail_title",       ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_detail_vote_title",  ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
-  for i=1,4 do add{Name=string.format("odg_detail_vote_mode_%d",i),ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,3 do add{Name=string.format("odg_detail_vote_mode_%d",i),ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1} end
   add{Name="odg_detail_preset",      ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
-  for i=1,6 do add{Name=string.format("odg_detail_choice_label_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
-  for i=1,6 do add{Name=string.format("odg_detail_choice_color_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,5 do add{Name=string.format("odg_detail_choice_label_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,5 do add{Name=string.format("odg_detail_choice_color_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
   for i=1,2 do add{Name=string.format("odg_detail_result_vis_%d",i),ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1} end
   add{Name="odg_detail_realtime",    ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
   add{Name="odg_json_export",        ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
@@ -101,18 +101,18 @@ function GetControls(props)
   add{Name="vote_use_config",        ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
   add{Name="vote_title_display",     ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   add{Name="vote_manual_title",      ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
-  for i=1,6 do add{Name=string.format("vote_choice_label_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
-  for i=1,6 do add{Name=string.format("vote_choice_color_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,5 do add{Name=string.format("vote_choice_label_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,5 do add{Name=string.format("vote_choice_color_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
   add{Name="vote_num_choices",       ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
   for i=1,2 do add{Name=string.format("vote_result_vis_%d",i),ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1} end
   add{Name="vote_realtime",          ControlType="Button",ButtonType="Toggle",PinStyle="Both",UserPin=true,Count=1}
   add{Name="vote_start",             ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="vote_stop",              ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
   add{Name="vote_hide_results",      ControlType="Button",ButtonType="Trigger",PinStyle="Both",UserPin=true,Count=1}
-  for i=1,6 do add{Name=string.format("vote_result_label_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
-  for i=1,6 do add{Name=string.format("vote_result_count_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
-  for i=1,6 do add{Name=string.format("vote_result_bar_%d",i),  ControlType="Knob",ControlUnit="Float",Min=0,Max=100,PinStyle="Both",UserPin=true,Count=1} end
-  for i=1,6 do add{Name=string.format("vote_result_pct_%d",i),  ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,5 do add{Name=string.format("vote_result_label_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,5 do add{Name=string.format("vote_result_count_%d",i),ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,5 do add{Name=string.format("vote_result_bar_%d",i),  ControlType="Knob",ControlUnit="Float",Min=0,Max=100,PinStyle="Both",UserPin=true,Count=1} end
+  for i=1,5 do add{Name=string.format("vote_result_pct_%d",i),  ControlType="Text",PinStyle="Both",UserPin=true,Count=1} end
   add{Name="vote_total_votes",       ControlType="Text",PinStyle="Both",UserPin=true,Count=1}
 
   -- Tab 4: Risultati
@@ -160,215 +160,210 @@ function GetControlLayout(props)
   local layout   = {}
   local graphics = {}
   local pg = props["page_index"].Value
+  local W  = 1100
 
   local function hdr(txt)
-    table.insert(graphics,{Type="GroupBox",Fill=C.Hdr,StrokeWidth=0,CornerRadius=0,Position={0,0},Size={900,38}})
-    table.insert(graphics,{Type="Label",Text=txt,Font="Lato",FontStyle="Bold",FontSize=14,Color=C.TV,HTextAlign="Left",Position={10,8},Size={780,22}})
+    table.insert(graphics,{Type="GroupBox",Fill=C.Hdr,StrokeWidth=0,CornerRadius=0,Position={0,0},Size={W,38}})
+    table.insert(graphics,{Type="Label",Text=txt,Font="Lato",FontStyle="Bold",FontSize=14,Color=C.TV,HTextAlign="Left",Position={10,8},Size={W-20,22}})
   end
   local function lbl(txt,x,y,w,h,sz,col,align)
     table.insert(graphics,{Type="Label",Text=txt,FontSize=sz or 10,Color=col or C.LtGy,HTextAlign=align or "Left",Position={x,y},Size={w,h}})
   end
   local function sep(y)
-    table.insert(graphics,{Type="GroupBox",Fill=C.Gray,StrokeWidth=0,Position={0,y},Size={900,1}})
+    table.insert(graphics,{Type="GroupBox",Fill=C.Gray,StrokeWidth=0,Position={0,y},Size={W,1}})
   end
   local function gbox(txt,x,y,w,h)
     table.insert(graphics,{Type="GroupBox",Text=txt,TextFont="Lato",TextFontSize=9,TextColor=C.LtGy,Fill=C.Dark,StrokeColor=C.Gray,StrokeWidth=1,CornerRadius=4,Position={x,y},Size={w,h}})
   end
-  local function shared()
+  local function connbar()
+    table.insert(graphics,{Type="GroupBox",Fill={35,42,52},StrokeWidth=0,CornerRadius=0,Position={0,38},Size={W,30}})
     layout["Status"]          ={Style="Status",Position={2,8},Size={18,22}}
-    layout["conn_status_led"] ={Style="Led",Position={798,10},Size={14,14},Color=C.Grn,OffColor=C.Red,UnlinkOffColor=true}
-    layout["conn_status_text"]={Style="Text",Position={816,8},Size={78,18},IsReadOnly=true,FontSize=9}
-    layout["debug_log"]       ={Style="Text",Position={0,645},Size={900,16},IsReadOnly=true,FontSize=8}
+    layout["conn_status_led"] ={Style="Led",Position={14,47},Size={14,14},Color=C.Grn,OffColor=C.Red,UnlinkOffColor=true}
+    layout["conn_status_text"]={Style="Text",Position={34,45},Size={140,22},IsReadOnly=true,FontSize=9}
+    layout["ConnectServer"]   ={Style="Button",Position={182,45},Size={88,22},Legend="Connetti",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["ConnectStatus"]   ={Style="ComboBox",Position={278,45},Size={90,22}}
+    layout["debug_log"]       ={Style="Text",Position={0,680},Size={W,50},IsReadOnly=true,FontSize=10}
   end
 
   -- ── Page 1: Ordine del Giorno ─────────────────────────────────────────────────
   if pg == 1 then
     hdr("Ordine del Giorno / Agenda")
-    shared()
+    connbar()
 
-    lbl("Titolo Riunione",10,44,100,14,9)
-    layout["odg_meeting_title"]={Style="Text",Position={10,58},Size={340,22}}
-    lbl("Data (GG/MM/AAAA)",358,44,130,14,9)
-    layout["odg_meeting_date"]={Style="Text",Position={358,58},Size={130,22}}
-    layout["odg_save_agenda"] ={Style="Button",Position={496,57},Size={92,24},Legend="Salva",Color=C.Blu}
-    layout["odg_load_agenda"] ={Style="Button",Position={594,57},Size={92,24},Legend="Carica"}
-    layout["odg_new_agenda"]  ={Style="Button",Position={692,57},Size={92,24},Legend="Nuovo OdG",Color=C.Orn}
+    lbl("Titolo Riunione",10,76,120,14,9)
+    layout["odg_meeting_title"]={Style="Text",Position={10,90},Size={420,22}}
+    lbl("Data (GG/MM/AAAA)",438,76,130,14,9)
+    layout["odg_meeting_date"]={Style="Text",Position={438,90},Size={130,22}}
+    layout["odg_save_agenda"] ={Style="Button",Position={576,89},Size={92,24},Legend="Salva",Color=C.Blu}
+    layout["odg_load_agenda"] ={Style="Button",Position={674,89},Size={92,24},Legend="Carica"}
+    layout["odg_new_agenda"]  ={Style="Button",Position={772,89},Size={110,24},Legend="Nuovo OdG",Color=C.Orn}
 
-    lbl("Date salvate:",10,87,90,14,9)
+    lbl("Date salvate:",10,119,90,14,9)
     for i=1,4 do
-      local x=100+(i-1)*198
-      layout[string.format("odg_date_label_%d",i)]  ={Style="Text",Position={x,85},Size={120,18},IsReadOnly=true}
-      layout[string.format("odg_date_select_%d",i)] ={Style="Button",Position={x+122,83},Size={72,22},Legend="Carica"}
+      local x=100+(i-1)*248
+      layout[string.format("odg_date_label_%d",i)]  ={Style="Text",Position={x,117},Size={170,18},IsReadOnly=true}
+      layout[string.format("odg_date_select_%d",i)] ={Style="Button",Position={x+172,115},Size={72,22},Legend="Carica"}
     end
 
-    sep(107)
-    lbl("N°",10,112,30,14,9,C.TV)
-    lbl("Titolo Punto / Item Title",44,112,490,14,9,C.TV)
-    lbl("Voto?",540,112,60,14,9,C.TV)
-    lbl("Sel.",608,112,60,14,9,C.TV)
+    sep(139)
+    lbl("N°",10,144,30,14,9,C.TV)
+    lbl("Titolo Punto / Item Title",44,144,620,14,9,C.TV)
+    lbl("Voto?",670,144,60,14,9,C.TV)
+    lbl("Sel.",740,144,60,14,9,C.TV)
 
     for i=1,5 do
-      local y=128+(i-1)*36
-      layout[string.format("odg_item_title_%d",i)]   ={Style="Text",Position={44,y},Size={490,22},IsReadOnly=true}
-      layout[string.format("odg_item_has_vote_%d",i)] ={Style="Button",Position={540,y},Size={60,22},Legend="V",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
-      layout[string.format("odg_item_select_%d",i)]   ={Style="Button",Position={608,y},Size={60,22},Legend="Sel.",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+      local y=160+(i-1)*36
+      layout[string.format("odg_item_title_%d",i)]    ={Style="Text",Position={44,y},Size={620,22},IsReadOnly=true}
+      layout[string.format("odg_item_has_vote_%d",i)] ={Style="Button",Position={670,y},Size={60,22},Legend="V",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+      layout[string.format("odg_item_select_%d",i)]   ={Style="Button",Position={740,y},Size={60,22},Legend="Sel.",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
     end
 
-    layout["odg_page_prev"]     ={Style="Button",Position={10,316},Size={80,24},Legend="◀ Prec."}
-    layout["odg_page_indicator"]={Style="Text",Position={96,316},Size={160,24},IsReadOnly=true}
-    layout["odg_page_next"]     ={Style="Button",Position={262,316},Size={80,24},Legend="Succ. ▶"}
-    layout["odg_add_item"]      ={Style="Button",Position={370,316},Size={110,24},Legend="+ Aggiungi",Color=C.Grn}
-    layout["odg_remove_item"]   ={Style="Button",Position={486,316},Size={110,24},Legend="- Rimuovi",Color=C.Red}
-    layout["odg_move_up"]       ={Style="Button",Position={602,316},Size={60,24},Legend="Su"}
-    layout["odg_move_down"]     ={Style="Button",Position={668,316},Size={60,24},Legend="Giu"}
+    layout["odg_page_prev"]     ={Style="Button",Position={10,348},Size={80,24},Legend="◀ Prec."}
+    layout["odg_page_indicator"]={Style="Text",Position={96,348},Size={160,24},IsReadOnly=true}
+    layout["odg_page_next"]     ={Style="Button",Position={262,348},Size={80,24},Legend="Succ. ▶"}
+    layout["odg_add_item"]      ={Style="Button",Position={370,348},Size={110,24},Legend="+ Aggiungi",Color=C.Grn}
+    layout["odg_remove_item"]   ={Style="Button",Position={486,348},Size={110,24},Legend="- Rimuovi",Color=C.Red}
+    layout["odg_move_up"]       ={Style="Button",Position={602,348},Size={60,24},Legend="Su"}
+    layout["odg_move_down"]     ={Style="Button",Position={668,348},Size={60,24},Legend="Giu"}
 
-    sep(348)
-    layout["odg_selected_label"]   ={Style="Text",Position={10,354},Size={880,18},IsReadOnly=true}
-    lbl("Titolo punto:",10,378,90,14,9)
-    layout["odg_detail_title"]     ={Style="Text",Position={10,392},Size={878,22}}
-    lbl("Titolo votazione:",10,420,100,14,9)
-    layout["odg_detail_vote_title"]={Style="Text",Position={10,434},Size={878,22}}
+    sep(380)
+    layout["odg_selected_label"]   ={Style="Text",Position={10,386},Size={1078,18},IsReadOnly=true}
+    lbl("Titolo punto:",10,410,90,14,9)
+    layout["odg_detail_title"]     ={Style="Text",Position={10,424},Size={1078,22}}
+    lbl("Titolo votazione:",10,452,100,14,9)
+    layout["odg_detail_vote_title"]={Style="Text",Position={10,466},Size={1078,22}}
 
-    lbl("Scelte:",10,462,50,14,9)
-    for i=1,4 do
-      layout[string.format("odg_detail_vote_mode_%d",i)]={Style="Button",Position={62+(i-1)*58,460},Size={54,22},Legend=tostring(i+2).." sc.",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+    lbl("Scelte:",10,494,50,14,9)
+    for i=1,3 do
+      layout[string.format("odg_detail_vote_mode_%d",i)]={Style="Button",Position={62+(i-1)*62,492},Size={58,22},Legend=tostring(i+2).." sc.",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
     end
-    layout["odg_detail_preset"]={Style="Button",Position={300,460},Size={90,22},Legend="Preset",Color=C.TV}
+    layout["odg_detail_preset"]={Style="Button",Position={254,492},Size={90,22},Legend="Preset",Color=C.TV}
 
-    lbl("Scelte 1-6 / label + colore hex",10,476,400,12,8)
-    for i=1,6 do
+    lbl("Scelte 1-5 / label + colore hex",10,508,300,12,8)
+    for i=1,5 do
       local row=math.ceil(i/2); local col=((i-1)%2)
-      local bx=10+col*440; local by=488+(row-1)*22
-      layout[string.format("odg_detail_choice_label_%d",i)]={Style="Text",Position={bx,by},Size={200,18}}
-      layout[string.format("odg_detail_choice_color_%d",i)]={Style="Text",Position={bx+205,by},Size={80,18}}
+      local bx=10+col*548; local by=520+(row-1)*24
+      layout[string.format("odg_detail_choice_label_%d",i)]={Style="Text",Position={bx,by},Size={270,20}}
+      layout[string.format("odg_detail_choice_color_%d",i)]={Style="Text",Position={bx+274,by},Size={100,20}}
     end
 
-    layout[string.format("odg_detail_result_vis_%d",1)]={Style="Button",Position={740,488},Size={75,18},Legend="Pubbl.",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
-    layout[string.format("odg_detail_result_vis_%d",2)]={Style="Button",Position={740,510},Size={75,18},Legend="Indiv.",ButtonStyle="Toggle",Color=C.Orn,OffColor=C.Gray,UnlinkOffColor=true}
-    layout["odg_detail_realtime"]={Style="Button",Position={820,488},Size={68,40},Legend="Realtime",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+    layout[string.format("odg_detail_result_vis_%d",1)]={Style="Button",Position={940,520},Size={75,20},Legend="Pubbl.",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout[string.format("odg_detail_result_vis_%d",2)]={Style="Button",Position={940,544},Size={75,20},Legend="Indiv.",ButtonStyle="Toggle",Color=C.Orn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["odg_detail_realtime"]={Style="Button",Position={1020,520},Size={68,44},Legend="Realtime",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
 
-    sep(556)
-    lbl("Export JSON:",10,561,80,12,9)
-    layout["odg_json_export"]={Style="Text",Position={10,574},Size={420,50}}
-    layout["odg_do_export"]  ={Style="Button",Position={10,628},Size={110,20},Legend="Genera Export"}
-    lbl("Import JSON:",440,561,80,12,9)
-    layout["odg_json_import"]={Style="Text",Position={440,574},Size={448,50}}
-    layout["odg_do_import"]  ={Style="Button",Position={440,628},Size={110,20},Legend="Importa",Color=C.Blu}
+    sep(576)
+    lbl("Export JSON:",10,582,80,12,9)
+    layout["odg_json_export"]={Style="Text",Position={10,596},Size={530,60}}
+    layout["odg_do_export"]  ={Style="Button",Position={10,660},Size={120,18},Legend="Genera Export"}
+    lbl("Import JSON:",556,582,80,12,9)
+    layout["odg_json_import"]={Style="Text",Position={556,596},Size={532,60}}
+    layout["odg_do_import"]  ={Style="Button",Position={556,660},Size={120,18},Legend="Importa",Color=C.Blu}
 
   -- ── Page 2: Riunione ─────────────────────────────────────────────────────────
   elseif pg == 2 then
     hdr("Riunione / Meeting")
-    shared()
+    connbar()
 
-    layout["mtg_status_led"] ={Style="Led",Position={10,50},Size={16,16},Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
-    layout["mtg_status_text"]={Style="Text",Position={30,48},Size={260,20},IsReadOnly=true}
-    layout["mtg_start"]      ={Style="Button",Position={10,76},Size={180,36},Legend="▶ Avvia Riunione",Color=C.Grn}
-    layout["mtg_end"]        ={Style="Button",Position={200,76},Size={180,36},Legend="■ Termina Riunione",Color=C.Red}
+    layout["mtg_status_led"] ={Style="Led",Position={10,82},Size={16,16},Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["mtg_status_text"]={Style="Text",Position={30,80},Size={300,20},IsReadOnly=true}
+    layout["mtg_start"]      ={Style="Button",Position={10,108},Size={210,36},Legend="▶ Avvia Riunione",Color=C.Grn}
+    layout["mtg_end"]        ={Style="Button",Position={230,108},Size={210,36},Legend="■ Termina Riunione",Color=C.Red}
 
-    sep(122)
-    lbl("Punto corrente / Current Item",10,130,300,14,10,C.TV)
-    layout["mtg_current_item_text"]={Style="Text",Position={10,148},Size={878,80},IsReadOnly=true,FontSize=20}
-    layout["mtg_current_item_num"] ={Style="Text",Position={10,236},Size={878,22},IsReadOnly=true,FontSize=13}
-    layout["mtg_prev_item"]={Style="Button",Position={10,266},Size={160,36},Legend="◀ Precedente"}
-    layout["mtg_next_item"]={Style="Button",Position={180,266},Size={160,36},Legend="Successivo ▶"}
+    sep(154)
+    lbl("Punto corrente / Current Item",10,162,300,14,10,C.TV)
+    layout["mtg_current_item_text"]={Style="Text",Position={10,180},Size={1078,80},IsReadOnly=true,FontSize=20}
+    layout["mtg_current_item_num"] ={Style="Text",Position={10,268},Size={1078,24},IsReadOnly=true,FontSize=13}
+    layout["mtg_prev_item"]={Style="Button",Position={10,300},Size={180,36},Legend="◀ Precedente"}
+    layout["mtg_next_item"]={Style="Button",Position={200,300},Size={180,36},Legend="Successivo ▶"}
 
-    sep(312)
-    lbl("Discussione / Discussion",10,320,250,14,10,C.TV)
-    layout["mtg_start_discussion"] ={Style="Button",Position={10,338},Size={200,36},Legend="▶ Avvia Discussione",Color=C.Grn}
-    layout["mtg_stop_discussion"]  ={Style="Button",Position={220,338},Size={200,36},Legend="■ Ferma Discussione",Color=C.Orn}
-    layout["mtg_discussion_status"]={Style="Text",Position={10,384},Size={878,22},IsReadOnly=true}
+    sep(346)
+    lbl("Discussione / Discussion",10,354,250,14,10,C.TV)
+    layout["mtg_start_discussion"] ={Style="Button",Position={10,372},Size={220,36},Legend="▶ Avvia Discussione",Color=C.Grn}
+    layout["mtg_stop_discussion"]  ={Style="Button",Position={240,372},Size={220,36},Legend="■ Ferma Discussione",Color=C.Orn}
+    layout["mtg_discussion_status"]={Style="Text",Position={10,418},Size={1078,22},IsReadOnly=true}
 
   -- ── Page 3: Votazione ────────────────────────────────────────────────────────
   elseif pg == 3 then
     hdr("Votazione / Voting")
-    shared()
+    connbar()
 
-    layout["vote_status_led"] ={Style="Led",Position={10,50},Size={16,16},Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
-    layout["vote_status_text"]={Style="Text",Position={30,48},Size={260,20},IsReadOnly=true}
-    layout["vote_use_config"] ={Style="Button",Position={10,76},Size={200,24},Legend="Usa Config Punto",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
-    layout["vote_num_choices"]={Style="Text",Position={730,76},Size={158,24},IsReadOnly=true}
+    layout["vote_status_led"] ={Style="Led",Position={10,82},Size={16,16},Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["vote_status_text"]={Style="Text",Position={30,80},Size={300,20},IsReadOnly=true}
+    layout["vote_use_config"] ={Style="Button",Position={10,108},Size={220,24},Legend="Usa Config Punto",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["vote_num_choices"]={Style="Text",Position={840,108},Size={248,24},IsReadOnly=true}
 
-    layout["vote_title_display"]={Style="Text",Position={10,106},Size={878,26},IsReadOnly=true,FontSize=14}
-    lbl("Override titolo manuale:",10,138,140,14,9)
-    layout["vote_manual_title"] ={Style="Text",Position={10,152},Size={878,22}}
+    layout["vote_title_display"]={Style="Text",Position={10,140},Size={1078,28},IsReadOnly=true,FontSize=14}
+    lbl("Override titolo manuale:",10,174,140,14,9)
+    layout["vote_manual_title"] ={Style="Text",Position={10,188},Size={1078,22}}
 
-    lbl("Scelte / Choices",10,180,150,14,10,C.TV)
-    for i=1,6 do
-      local y=198+(i-1)*22
-      lbl(tostring(i)..":",10,y,16,18,9)
-      layout[string.format("vote_choice_label_%d",i)]={Style="Text",Position={28,y},Size={200,18}}
-      layout[string.format("vote_choice_color_%d",i)]={Style="Text",Position={232,y},Size={90,18}}
+    lbl("Scelte / Choices",10,216,150,14,10,C.TV)
+    for i=1,5 do
+      local y=234+(i-1)*24
+      lbl(tostring(i)..":",10,y,16,20,9)
+      layout[string.format("vote_choice_label_%d",i)]={Style="Text",Position={28,y},Size={260,20}}
+      layout[string.format("vote_choice_color_%d",i)]={Style="Text",Position={292,y},Size={110,20}}
     end
 
-    layout[string.format("vote_result_vis_%d",1)]={Style="Button",Position={340,198},Size={130,22},Legend="Pubblico",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
-    layout[string.format("vote_result_vis_%d",2)]={Style="Button",Position={340,224},Size={130,22},Legend="Individuale",ButtonStyle="Toggle",Color=C.Orn,OffColor=C.Gray,UnlinkOffColor=true}
-    layout["vote_realtime"]    ={Style="Button",Position={340,250},Size={130,22},Legend="Realtime ON",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+    layout[string.format("vote_result_vis_%d",1)]={Style="Button",Position={430,234},Size={140,24},Legend="Pubblico",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout[string.format("vote_result_vis_%d",2)]={Style="Button",Position={430,262},Size={140,24},Legend="Individuale",ButtonStyle="Toggle",Color=C.Orn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["vote_realtime"]    ={Style="Button",Position={430,290},Size={140,24},Legend="Realtime ON",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
 
-    layout["vote_start"]       ={Style="Button",Position={10,334},Size={180,36},Legend="▶ Avvia Votazione",Color=C.Grn}
-    layout["vote_stop"]        ={Style="Button",Position={200,334},Size={180,36},Legend="■ Chiudi Votazione",Color=C.Red}
-    layout["vote_hide_results"]={Style="Button",Position={390,334},Size={180,36},Legend="Nascondi Risultati"}
+    layout["vote_start"]       ={Style="Button",Position={10,358},Size={210,36},Legend="▶ Avvia Votazione",Color=C.Grn}
+    layout["vote_stop"]        ={Style="Button",Position={230,358},Size={210,36},Legend="■ Chiudi Votazione",Color=C.Red}
+    layout["vote_hide_results"]={Style="Button",Position={450,358},Size={200,36},Legend="Nascondi Risultati"}
 
-    sep(380)
-    lbl("Risultati Live / Live Results",10,387,250,14,10,C.TV)
-    layout["vote_total_votes"]={Style="Text",Position={700,385},Size={188,18},IsReadOnly=true}
+    sep(404)
+    lbl("Risultati Live / Live Results",10,411,250,14,10,C.TV)
+    layout["vote_total_votes"]={Style="Text",Position={820,409},Size={268,20},IsReadOnly=true}
 
-    for i=1,6 do
-      local y=408+(i-1)*36
-      layout[string.format("vote_result_label_%d",i)]={Style="Text",Position={10,y},Size={200,22},IsReadOnly=true}
-      layout[string.format("vote_result_count_%d",i)]={Style="Text",Position={214,y},Size={100,22},IsReadOnly=true}
-      layout[string.format("vote_result_bar_%d",i)]  ={Style="Meter",Position={318,y},Size={400,22},Min=0,Max=100}
-      layout[string.format("vote_result_pct_%d",i)]  ={Style="Text",Position={722,y},Size={60,22},IsReadOnly=true}
+    for i=1,5 do
+      local y=432+(i-1)*44
+      layout[string.format("vote_result_label_%d",i)]={Style="Text",Position={10,y},Size={260,22},IsReadOnly=true}
+      layout[string.format("vote_result_count_%d",i)]={Style="Text",Position={274,y},Size={100,22},IsReadOnly=true}
+      layout[string.format("vote_result_bar_%d",i)]  ={Style="Meter",Position={378,y},Size={620,22},Min=0,Max=100}
+      layout[string.format("vote_result_pct_%d",i)]  ={Style="Text",Position={1002,y},Size={86,22},IsReadOnly=true}
     end
 
   -- ── Page 4: Risultati ────────────────────────────────────────────────────────
   elseif pg == 4 then
     hdr("Risultati / Results")
-    shared()
+    connbar()
 
-    layout["res_clear"]        ={Style="Button",Position={752,7},Size={42,24},Legend="Reset",Color=C.Red}
-    lbl("N°",10,44,30,14,9,C.TV)
-    lbl("Titolo Punto",44,44,296,14,9,C.TV)
-    lbl("Votazione",344,44,256,14,9,C.TV)
-    lbl("Risultato",604,44,218,14,9,C.TV)
-    lbl("Tot",826,44,54,14,9,C.TV)
+    layout["res_clear"]        ={Style="Button",Position={980,45},Size={100,22},Legend="Reset",Color=C.Red}
+    lbl("N°",10,76,30,14,9,C.TV)
+    lbl("Titolo Punto",44,76,340,14,9,C.TV)
+    lbl("Votazione",388,76,300,14,9,C.TV)
+    lbl("Risultato",692,76,300,14,9,C.TV)
+    lbl("Tot",996,76,90,14,9,C.TV)
 
     for i=1,20 do
-      local y=60+(i-1)*27
-      layout[string.format("res_item_title_%d",i)]  ={Style="Text",Position={44,y},Size={296,22},IsReadOnly=true}
-      layout[string.format("res_item_vtitle_%d",i)] ={Style="Text",Position={344,y},Size={256,22},IsReadOnly=true}
-      layout[string.format("res_item_summary_%d",i)]={Style="Text",Position={604,y},Size={218,22},IsReadOnly=true}
-      layout[string.format("res_item_total_%d",i)]  ={Style="Text",Position={826,y},Size={54,22},IsReadOnly=true}
+      local y=92+(i-1)*27
+      layout[string.format("res_item_title_%d",i)]  ={Style="Text",Position={44,y},Size={340,22},IsReadOnly=true}
+      layout[string.format("res_item_vtitle_%d",i)] ={Style="Text",Position={388,y},Size={300,22},IsReadOnly=true}
+      layout[string.format("res_item_summary_%d",i)]={Style="Text",Position={692,y},Size={300,22},IsReadOnly=true}
+      layout[string.format("res_item_total_%d",i)]  ={Style="Text",Position={996,y},Size={90,22},IsReadOnly=true}
     end
 
-    layout["res_page_prev"]     ={Style="Button",Position={10,612},Size={80,22},Legend="◀ Prec."}
-    layout["res_page_indicator"]={Style="Text",Position={96,612},Size={160,22},IsReadOnly=true}
-    layout["res_page_next"]     ={Style="Button",Position={262,612},Size={80,22},Legend="Succ. ▶"}
+    layout["res_page_prev"]     ={Style="Button",Position={10,638},Size={80,22},Legend="◀ Prec."}
+    layout["res_page_indicator"]={Style="Text",Position={96,638},Size={160,22},IsReadOnly=true}
+    layout["res_page_next"]     ={Style="Button",Position={262,638},Size={80,22},Legend="Succ. ▶"}
 
   -- ── Page 5: Sistema / System ─────────────────────────────────────────────────
   elseif pg == 5 then
     hdr("Sistema / System")
-    layout["Status"]          ={Style="Status",Position={2,8},Size={18,22}}
-    layout["conn_status_led"] ={Style="Led",Position={798,10},Size={14,14},Color=C.Grn,OffColor=C.Red,UnlinkOffColor=true}
-    layout["conn_status_text"]={Style="Text",Position={816,8},Size={78,18},IsReadOnly=true,FontSize=9}
-
-    -- Connessione groupbox
-    gbox("Connessione",4,42,888,56)
-    layout["conn_status_led"] ={Style="Led",Position={14,52},Size={16,16},Color=C.Grn,OffColor=C.Red,UnlinkOffColor=true}
-    layout["conn_status_text"]={Style="Text",Position={36,50},Size={140,22},IsReadOnly=true}
-    layout["ConnectServer"]   ={Style="Button",Position={184,50},Size={80,22},Legend="Connetti",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
-    layout["ConnectStatus"]   ={Style="ComboBox",Position={272,50},Size={100,22}}
+    connbar()
 
     -- Room layout
     local seats = props["Seats"].Value
-    local cols  = 12
+    local cols  = 14
     local rows  = math.ceil(seats/cols)
     local room_h = rows*40+20
-    local ry = 106
-    gbox("Layout Sala / Room Layout",4,ry,888,room_h)
+    local ry = 76
+    gbox("Layout Sala / Room Layout",4,ry,W-8,room_h)
     for i=1,seats do
       local r=math.ceil(i/cols)-1
       local c=(i-1)%cols
-      local bx=14+c*72
+      local bx=14+c*76
       local by=ry+20+r*40
       layout[string.format("SeatButton_%d",i)]={Style="Button",Position={bx,by},Size={30,30},Legend=tostring(i),ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
       layout[string.format("RequestLED_%d",i)]={Style="Led",Position={bx+18,by},Size={12,12},Color=C.Orn,OffColor={0,0,0},UnlinkOffColor=true}
@@ -376,61 +371,58 @@ function GetControlLayout(props)
 
     -- Audio groupbox
     local ay = ry + room_h + 8
-    gbox("Audio",4,ay,888,62)
+    gbox("Audio",4,ay,W-8,62)
     lbl("Default Headphone vol.",14,ay+10,160,14,9)
-    layout["Defaultchannelselectorvolume"]    ={Style="Fader",Position={180,ay+8},Size={160,22},Min=0,Max=32,Orientation="Horizontal"}
-    layout["DefaultchannelselectorvolumeText"]={Style="Text",Position={346,ay+8},Size={60,22},IsReadOnly=true}
+    layout["Defaultchannelselectorvolume"]    ={Style="Fader",Position={180,ay+8},Size={220,22},Min=0,Max=32,Orientation="Horizontal"}
+    layout["DefaultchannelselectorvolumeText"]={Style="Text",Position={406,ay+8},Size={70,22},IsReadOnly=true}
     lbl("Speaker volume",14,ay+36,130,14,9)
-    layout["LoudSpeakervolume"]    ={Style="Fader",Position={180,ay+34},Size={160,22},Min=0,Max=25,Orientation="Horizontal"}
-    layout["LoudSpeakervolumeText"]={Style="Text",Position={346,ay+34},Size={60,22},IsReadOnly=true}
+    layout["LoudSpeakervolume"]    ={Style="Fader",Position={180,ay+34},Size={220,22},Min=0,Max=25,Orientation="Horizontal"}
+    layout["LoudSpeakervolumeText"]={Style="Text",Position={406,ay+34},Size={70,22},IsReadOnly=true}
 
     -- Riunione groupbox
     local my = ay + 70
-    gbox("Riunione",4,my,888,86)
+    gbox("Riunione",4,my,W-8,86)
     layout["MeetingType"] ={Style="Led",Position={14,my+12},Size={16,16},Color=C.Grn,OffColor=C.Red,UnlinkOffColor=true}
-    layout["MeetingTitle"]={Style="ComboBox",Position={36,my+10},Size={300,22}}
-    layout["SeatsList"]   ={Style="ListBox",Position={14,my+38},Size={420,40}}
-    lbl("Partecipanti al microfono:",446,my+10,200,14,9)
-    layout["SpeakerList"] ={Style="ListBox",Position={446,my+28},Size={430,50}}
+    layout["MeetingTitle"]={Style="ComboBox",Position={36,my+10},Size={400,22}}
+    layout["SeatsList"]   ={Style="ListBox",Position={14,my+38},Size={500,40}}
+    lbl("Partecipanti al microfono:",530,my+10,200,14,9)
+    layout["SpeakerList"] ={Style="ListBox",Position={530,my+28},Size={W-540,50}}
 
     -- Microfono groupbox
     local micy = my + 94
-    gbox("Microfono / Mic",4,micy,888,86)
-    layout["TurnOnMic"]  ={Style="Button",Position={14,micy+14},Size={120,22},Legend="Turn On Mic",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
-    layout["TurnOffMic"] ={Style="Button",Position={142,micy+14},Size={120,22},Legend="Turn Off Mic",ButtonStyle="Toggle",Color=C.Red,OffColor=C.Gray,UnlinkOffColor=true}
-    layout["ToSpeaker"]  ={Style="Button",Position={270,micy+14},Size={120,22},Legend="To Speaker",ButtonStyle="Toggle",Color=C.Orn,OffColor=C.Gray,UnlinkOffColor=true}
+    gbox("Microfono / Mic",4,micy,W-8,86)
+    layout["TurnOnMic"]  ={Style="Button",Position={14,micy+14},Size={130,22},Legend="Turn On Mic",ButtonStyle="Toggle",Color=C.Grn,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["TurnOffMic"] ={Style="Button",Position={154,micy+14},Size={130,22},Legend="Turn Off Mic",ButtonStyle="Toggle",Color=C.Red,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["ToSpeaker"]  ={Style="Button",Position={294,micy+14},Size={130,22},Legend="To Speaker",ButtonStyle="Toggle",Color=C.Orn,OffColor=C.Gray,UnlinkOffColor=true}
     lbl("Lista richieste:",14,micy+44,110,14,9)
-    layout["RequestList"]={Style="ListBox",Position={14,micy+58},Size={420,22}}
+    layout["RequestList"]={Style="ListBox",Position={14,micy+58},Size={500,22}}
 
     -- Registrazione groupbox
     local recy = micy + 88
-    gbox("Registrazione / Recording",4,recy,888,52)
+    gbox("Registrazione / Recording",4,recy,W-8,52)
     layout["Recording"]       ={Style="Led",Position={14,recy+18},Size={16,16},Color=C.Red,OffColor=C.Gray,UnlinkOffColor=true}
-    layout["RecordingStatus"] ={Style="ComboBox",Position={36,recy+16},Size={200,22}}
-    layout["StartRecording"]  ={Style="Button",Position={244,recy+16},Size={140,22},Legend="Start/Stop Recording",ButtonStyle="Toggle",Color=C.Red,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["RecordingStatus"] ={Style="ComboBox",Position={36,recy+16},Size={220,22}}
+    layout["StartRecording"]  ={Style="Button",Position={264,recy+16},Size={180,22},Legend="Start/Stop Recording",ButtonStyle="Toggle",Color=C.Red,OffColor=C.Gray,UnlinkOffColor=true}
 
-    local dbgy = recy + 60
-    layout["debug_log"]={Style="Text",Position={0,dbgy},Size={900,16},IsReadOnly=true,FontSize=8}
+    -- override debug position for tab 5 (dynamic content)
+    local dbgy = recy + 58
+    layout["debug_log"]={Style="Text",Position={0,dbgy},Size={W,50},IsReadOnly=true,FontSize=10}
 
   -- ── Page 6: Wireless ─────────────────────────────────────────────────────────
   elseif pg == 6 then
     hdr("Wireless")
-    layout["Status"]          ={Style="Status",Position={2,8},Size={18,22}}
-    layout["conn_status_led"] ={Style="Led",Position={798,10},Size={14,14},Color=C.Grn,OffColor=C.Red,UnlinkOffColor=true}
-    layout["conn_status_text"]={Style="Text",Position={816,8},Size={78,18},IsReadOnly=true,FontSize=9}
+    connbar()
 
-    gbox("Wireless",4,44,888,270)
-    layout["WirelessDeviceList"]={Style="ListBox",Position={14,60},Size={440,180}}
-    layout["GetWirelessUnits"]  ={Style="Button",Position={14,248},Size={100,22},Legend="Get Status",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
-    layout["WirelessShutdown"]  ={Style="Button",Position={122,248},Size={100,22},Legend="Shutdown",ButtonStyle="Toggle",Color=C.Red,OffColor=C.Gray,UnlinkOffColor=true}
-
-    layout["debug_log"]={Style="Text",Position={0,645},Size={900,16},IsReadOnly=true,FontSize=8}
+    gbox("Wireless",4,76,W-8,280)
+    layout["WirelessDeviceList"]={Style="ListBox",Position={14,92},Size={560,190}}
+    layout["GetWirelessUnits"]  ={Style="Button",Position={14,290},Size={110,22},Legend="Get Status",ButtonStyle="Toggle",Color=C.Blu,OffColor=C.Gray,UnlinkOffColor=true}
+    layout["WirelessShutdown"]  ={Style="Button",Position={132,290},Size={110,22},Legend="Shutdown",ButtonStyle="Toggle",Color=C.Red,OffColor=C.Gray,UnlinkOffColor=true}
 
   -- ── Page 7: Info ─────────────────────────────────────────────────────────────
   elseif pg == 7 then
     hdr("Info")
-    shared()
-    layout["info_display"]={Style="Text",Position={50,50},Size={800,560},IsReadOnly=true,FontSize=13}
+    connbar()
+    layout["info_display"]={Style="Text",Position={50,80},Size={W-100,570},IsReadOnly=true,FontSize=13}
   end
 
   return layout, graphics
@@ -1292,7 +1284,7 @@ if Controls then
     Green="#00AA00", Red="#CC0000", Yellow="#CCAA00", Blue="#0066CC",
     White="#FFFFFF", Gray="#888888", Orange="#FF6600", Purple="#9900CC",
   }
-  local CHOICE_BTN = {"+", "-", "0", "++", "--", "0"}
+  local CHOICE_BTN = {"+", "-", "0", "++", "--"}
 
   local function BuildApiChoices(rawChoices)
     local out = {}
