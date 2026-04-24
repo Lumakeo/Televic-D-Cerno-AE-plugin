@@ -1,6 +1,6 @@
 PluginInfo = {
   Name        = "Confero~Agenda Manager",
-  Version     = "2.2.7",
+  Version     = "2.2.8",
   Id          = "Confero.AgendaManager.v2",
   Description = "Gestione ordine del giorno, votazioni, sedili e audio – Televic Confero (Plixus/G4)",
   Author      = "Matteo Fioretto – Prase, a Midwich company"
@@ -681,8 +681,8 @@ if Controls then
     if dir ~= "" then
       local ok_lfs, lfs_mod = pcall(require, "lfs")
       if ok_lfs and lfs_mod then
-        local r = lfs_mod.mkdir(dir)
-        Log("mkdir "..dir..": "..(r and "ok" or "già esistente/skip"))
+        local r, e = lfs_mod.mkdir(dir)
+        Log("mkdir "..dir..": "..(r and "ok" or tostring(e or "già esistente")))
       else
         os.execute('mkdir -p "'..dir..'" 2>/dev/null')
       end
@@ -693,7 +693,20 @@ if Controls then
       f:write(rj.encode({store=AgendaStore, current=AgendaData}))
       f:close()
     end)
-    if ok then Log("Salvato: "..path) else Log("Errore salvataggio: "..tostring(err)) end
+    if ok then
+      Log("Salvato: "..path)
+    else
+      Log("Errore salvataggio: "..tostring(err))
+      -- fallback: prova nella cartella media radice
+      if path ~= "media/agendas.json" then
+        local f2 = io.open("media/agendas.json","w")
+        if f2 then
+          f2:write(rj.encode({store=AgendaStore, current=AgendaData}))
+          f2:close()
+          Log("Salvato (fallback): media/agendas.json")
+        end
+      end
+    end
   end
 
   local function LoadFromFile()
@@ -1878,6 +1891,7 @@ if Controls then
   Controls["WirelessShutdown"].EventHandler = ShutdownWirelessUnits
 
   -- ── Init ─────────────────────────────────────────────────────────────────────
+  Log("Initialize v"..PluginInfo.Version.." path="..Properties["Data File Path"].Value)
   LoadFromFile()
   ReportStatus("NOTPRESENT")
   TransitionTo("NotConnected")
