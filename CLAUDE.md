@@ -14,12 +14,12 @@ git add -A && git commit -m "<description>" && git push origin main
 
 ## Progetto: Confero Agenda Manager
 
-### Stato attuale (2026-04-24) — v2.2.0 (commit `a272e70`)
+### Stato attuale (2026-04-24) — v2.2.4 (commit `ba54a42`)
 
 Plugin Q-SYS in Lua per gestione ordine del giorno, votazioni, sedili e audio su **Televic Confero (Plixus/G4)**.
 
 **File:**
-- `Confero-Agenda.qplug` — plugin principale (~1750 righe)
+- `Confero-Agenda.qplug` — plugin principale (~1800 righe)
 - `Agenda Builder.html` — tool HTML standalone per creare OdG con config votazioni
 - `KeyGen.py` — generatore chiavi di licenza (uso sviluppatore, Python 3.6+)
 - `Confero_V1.2.0-Beta.qplug` — riferimento Beta (non modificare)
@@ -135,6 +135,10 @@ State = { current, meetingId, votingId, discussionId, currentItemIdx,
 | v2.0.6 | `6d71c79` | `StartMeeting` popola `participants` con `presence:{kind="LocalParticipantPresence",seatNumber=N}` — attiva LED F-DV durante votazione; fallback a `participants:[]` se server rifiuta |
 | v2.1.0 | `a3a5800` | UI overhaul: finestra 1100px; barra connessione compatta su tutti i 7 tab; max scelte votazione ridotto a 5 (da 6, per hardware F-DV); `Agenda Builder.html` standalone |
 | v2.2.0 | `a272e70` | Sistema licenza: `CheckLicense()` via `GET https://127.0.0.1/api/v0/cores`; hash polinomiale `computeLicenseKey()`; bypass in emulazione; tab Info mostra Core Hardware ID e stato; `KeyGen.py` |
+| v2.2.1 | `ec571a4` | Fix loop runtime non allineati ai controlli v2.1.0: `for m=1,6→1,5` su choice/result controls; `for i=1,4→1,3` su vote_mode buttons — causava nil index crash al boot |
+| v2.2.2 | `54b0ae0` | `CheckLicense`: usa `System.SerialNumber` (nativo Lua) prima di HTTP; fallback HTTP porta 80 (non 443); `System.IsEmulating` senza parentesi (è proprietà, non funzione) |
+| v2.2.3 | `7693e1d` | `OnStartVoting` azzera `vote_result_*` e chiama `RefreshVotingPanel()` alla partenza; log diagnostico VoteResults; note: API Plixus non espone conteggi live (tot=0 durante votazione) |
+| v2.2.4 | `ba54a42` | Fix race condition polling: `votingStartTime` + grace period 3s per 412; `votingActive=true` impostato DOPO `TransitionTo`; `OnStopVoting` cattura `closedVotingId`; `MeetingTimer` polla anche su `State.current=="VotingActive"`; pre-popola label risultato da choice label |
 
 ---
 
@@ -160,11 +164,23 @@ State = { current, meetingId, votingId, discussionId, currentItemIdx,
 
 ## Note critiche sistema di licenza
 
-- `System.IsEmulating()` è sincrono — verificare sempre prima di fare HTTP a localhost.
-- `GET https://127.0.0.1/api/v0/cores` non richiede autenticazione; VerifyPeer=false.
+- `System.IsEmulating` (senza parentesi) è una proprietà booleana Lua nativa Q-SYS.
+- `CheckLicense` tenta prima `System.SerialNumber` (proprietà Lua, no HTTP); fallback a `GET http://127.0.0.1:80/api/v0/cores` (HTTP porta 80, non HTTPS 443).
 - Il SECRET `"CONFERO_PRASE_MIDWICH_2026"` è incorporato nel plugin — non modificarlo tra versioni senza rigenerare tutte le chiavi esistenti.
-- Il campo è `hardwareId` (camelCase) nella risposta JSON del Core.
+- La risposta JSON di `api/v0/cores` ha campo `hardwareId` (camelCase); `serial`/`naturalId` hanno lo stesso valore.
+- Chiave per Core 110f (`hardwareId=3-86AC24DA6D61EEC8D22C9BFA99A9BECD`): **`HYFK-H882-QEUN`** ✓ verificata.
+
+## Note critiche votazione (comportamento API Plixus confermato)
+
+- `GET api/meeting/voting-results` restituisce **sempre `count=0`** durante votazione attiva — il server Plixus accumula i voti internamente e li espone solo dopo la chiusura (`StopVotingAction`). I risultati live nel plugin non sono possibili.
+- Race condition risolta in v2.2.4: `votingActive=true` impostato DOPO `TransitionTo("VotingActive")`; grace period 3s per 412; `OnStopVoting` usa `closedVotingId` per non killare votazione successiva.
+- `resultVisibility="Individual"`: controlla cosa vedono i **partecipanti** sul proprio dispositivo F-DV (solo il proprio voto, non il totale). Il plugin operatore vede sempre i risultati globali — comportamento corretto.
+
+## Note file OdG
+
+- Percorso default `/data/agendas.json` — se Core restituisce "cannot open", cambiare in `/tmp/agendas.json` nelle Properties.
+- "Genera Export" → JSON nel campo testo (copia/incolla). "Salva" → scrive su file nel Core.
 
 ### Prossimi passi
-1. Test hardware v2.2.0: caricare su Core 110f (172.16.17.210), verificare che CheckLicense legga correttamente l'hardwareId e accetti la chiave `HYFK-H882-QEUN`
-2. Verificare percorso file OdG scrivibile sul Q-Core hardware (es. `/tmp/agendas.json`)
+1. Verificare percorso file OdG scrivibile sul Core hardware (provare `/tmp/agendas.json`)
+2. Testare risultati post-votazione: dopo chiusura i conteggi finali devono apparire correttamente
