@@ -643,24 +643,18 @@ if Controls then
       Timeout = 5,
       VerifyPeer = false,
       EventHandler = function(t, code, data, err, hdrs)
-        Log(string.format("CheckLicense HTTP %s '%s'", tostring(code), tostring(err or "")))
-        Log("CL data: " .. tostring(data or ""):sub(1,120))
         local hwid = ""
         if code == 200 then
           local ok, res = pcall(rj.decode, data)
-          Log("CL json ok=" .. tostring(ok) .. " type=" .. type(res))
           if ok and res then
             local first = (type(res) == "table" and res[1]) or (res.cores and res.cores[1]) or res
-            Log("CL first keys: " .. tostring(first.hardwareId) .. " / " .. tostring(first.hardwareID) .. " / " .. tostring(first.serialNo))
             hwid = tostring(first.hardwareId or first.hardwareID or first.serialNo or "")
           end
         end
         LicensedHwId = hwid ~= "" and hwid or ("HTTP:"..tostring(code))
         if hwid ~= "" then
-          local computed = computeLicenseKey(hwid)
           local provided = (Properties["LicenseKey"].Value or ""):match("^%s*(.-)%s*$")
-          Log(string.format("CL chk: prov='%s' comp='%s'", provided, computed))
-          Licensed = (provided == computed)
+          Licensed = (provided == computeLicenseKey(hwid))
         else
           Licensed = false
         end
@@ -861,7 +855,12 @@ if Controls then
     if code == 200 then
       State.httpErrCount = 0
       local ok, res = pcall(rj.decode, data)
-      if ok and res then RefreshVotingResults(res) end
+      if ok and res then
+        local choices = res.global or res.choices or {}
+        local total = 0; for _,c in ipairs(choices) do total=total+(c.count or 0) end
+        Log(string.format("VoteResults: id=%s tot=%d scelte=%d", tostring(res.votingId or "?"), total, #choices))
+        RefreshVotingResults(res)
+      end
     elseif code == 412 or code == 404 then
       State.votingActive = false
       if State.current == "VotingActive" then TransitionTo("MeetingActive") end
@@ -899,6 +898,15 @@ if Controls then
     if code==200 or code==201 then
       State.httpErrCount=0; State.votingActive=true
       State.votingId = data and data:match("^%s*(.-)%s*$") or nil
+      -- Azzera risultati della votazione precedente
+      for m=1,5 do
+        Controls[string.format("vote_result_label_%d",m)].String=""
+        Controls[string.format("vote_result_count_%d",m)].String=""
+        Controls[string.format("vote_result_bar_%d",m)].Value=0
+        Controls[string.format("vote_result_pct_%d",m)].String=""
+      end
+      Controls["vote_total_votes"].String=""
+      RefreshVotingPanel()
       TransitionTo("VotingActive")
       Log("Votazione avviata, id="..(tostring(State.votingId)))
     else Log("StartVoting failed: "..tostring(code).." "..tostring(err)) end
