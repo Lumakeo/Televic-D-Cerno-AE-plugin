@@ -159,7 +159,9 @@ function moveSelected(dir) {
 function selectItem(i) {
   saveCurrentDetail();
   selectedIdx = i;
-  renderAll();
+  renderList();
+  renderDetail();
+  document.getElementById('itemCount').textContent = items.length;
 }
 
 function saveCurrentDetail() {
